@@ -1,0 +1,213 @@
+= SPEC-1: gnedby - A CLI Tool to Track CD/LP Purchase History
+:sectnums:
+:toc:
+
+
+== Background
+
+gnedby is a command-line tool for managing your CD/LP collection. It allows you to easily add album information using Apple Music links, view lists and summary reports with various filters, and supports synchronization using Supabase.
+
+== Requirements
+
+- Must Have
+  * User can add a music album by providing an Apple Music album ID
+  * Album metadata (artist, album title, genre, release date) is fetched automatically
+  * Support for optional `--format lp` flag (default is CD)
+  * List (`show`) and summary report (`report`) commands with filters: year, artist, genre, format
+  * Local persistent storage using SQLite
+  * Sync command structure with check/push/pull support
+
+- Should Have
+  * Extensible CLI architecture (e.g. to support Bandcamp in future)
+  * Pretty CLI output (table formatting, optional colors)
+
+- Could Have
+  * Config file for defaults
+
+- Won't Have (initially)
+  * Price tracking
+  * Purchase location/date fields
+
+== Method
+
+The CLI is implemented in Rust, using `clap` for command parsing, `rusqlite` for database interactions, and `reqwest` for HTTP-based metadata extraction. The architecture includes the following components:
+
+[plantuml]
+----
+@startuml
+actor User
+User -> CLI : add <url> [--format lp]
+CLI -> MetadataFetcher : fetch_metadata(id)
+MetadataFetcher -> AppleMusic : GET album info
+AppleMusic --> MetadataFetcher : JSON response
+MetadataFetcher -> CLI : Album metadata
+CLI -> Database : INSERT INTO albums (...)
+User -> CLI : show [--year] [--artist] [--genre] [--format]
+User -> CLI : report [--year] [--genre] [--format]
+User -> CLI : sync check | pull | push
+CLI -> RemoteStore : Compare local vs remote meta.json
+RemoteStore --> CLI : metadata JSON
+CLI -> RemoteStore : Upload/Download albums.db
+@enduml
+----
+
+=== Command Structure (Final)
+
+[source,bash]
+----
+gnedby add <album_id> [--format lp]
+gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>]
+gnedby report [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>]
+gnedby sync check
+gnedby sync pull
+gnedby sync push
+----
+
+=== Database Schema
+
+[source,sql]
+----
+CREATE TABLE albums (
+    id INTEGER PRIMARY KEY,
+    artist TEXT NOT NULL,
+    album TEXT NOT NULL,
+    genre TEXT,
+    release_date TEXT,
+    format TEXT DEFAULT 'CD',
+    source_url TEXT NOT NULL
+);
+----
+
+=== Metadata Extraction
+
+Apple Music album IDs are looked up using the iTunes Search API.
+
+Example API call:
+[source,bash]
+----
+GET https://itunes.apple.com/lookup?id=1811804666&entity=album
+----
+
+This returns a JSON object from which the following fields are extracted:
+- `artistName`
+- `collectionName`
+- `releaseDate`
+- `primaryGenreName`
+
+=== Sync Implementation
+
+Sync follows a push/pull model with `check` support.
+
+- Local file: `albums.db`
+- Remote file: `albums.db` + `meta.json`
+- Sync Steps:
+  * `check`: Compare SHA256 hash or last modified timestamp
+  * `push`: Upload DB and metadata to S3, Dropbox or similar
+  * `pull`: Download and overwrite local DB (with backup)
+
+
+
+=== Configuration System
+
+Users must configure their Supabase Storage target and token before using sync commands. This is done using the `gnedby config` command.
+
+==== Supported Keys
+
+- `storage_url` – Supabase bucket base URL (e.g. `https://<project>.supabase.co/storage/v1/object/gnedby-sync`)
+- `token` – Supabase access token (User JWT or Service Role)
+
+==== Example Usage
+
+[source,bash]
+----
+gnedby config set storage_url https://project.supabase.co/storage/v1/object/gnedby-sync
+gnedby config set token sbp_xxxxxxx
+
+gnedby config get storage_url
+----
+
+These are stored in `~/.gnedby/config.json` and used by all sync commands.
+
+=== Supabase Sync Implementation
+
+For multi-device usage and safe synchronization, gnedby uses Supabase Storage as its remote backend.
+
+==== Structure
+
+Supabase bucket: `gnedby-sync`
+- `albums/albums.db` - Main SQLite database file
+- `albums/meta.json` - Metadata used for safe syncing
+
+meta.json example:
+[source,json]
+----
+{
+  "hash": "d4c3b4a1f2e1...",
+  "last_modified": "2025-05-03T15:30:00Z"
+}
+----
+
+==== Authentication
+
+User runs:
+[source,bash]
+----
+gnedby login <supabase_token>
+----
+
+Token is stored in `~/.gnedby/config.json` for subsequent operations.
+
+==== CLI Commands
+
+[source,bash]
+----
+gnedby sync check
+gnedby sync pull
+gnedby sync push
+----
+
+- `check`: Compares local SHA256 hash of albums.db with remote meta.json
+- `push`: Uploads current albums.db and updates meta.json
+- `pull`: Downloads remote albums.db and backs up local copy first
+
+==== Libraries
+
+- `reqwest` for HTTP requests
+- `serde_json` for JSON encoding/decoding
+- `sha2` for hash comparison
+- Supabase REST API or S3-compatible endpoints for file handling
+
+== Implementation
+
+1. CLI Setup and Argument Parsing
+2. API Integration with Apple Music (iTunes Search API)
+3. Database Initialization using rusqlite
+4. Metadata Fetch + Insert Logic
+5. `show` and `report` Command Filters
+6. Sync Subcommand: check, pull, push (with hash comparison)
+7. Packaging and Cross-platform Testing
+8. Documentation and README
+
+== Milestones
+
+1. CLI Setup and Argument Parsing
+2. API Integration
+3. Database Setup
+4. `add` Command Logic
+5. `show` and `report` Commands
+6. Sync Functionality (check, pull, push)
+7. Packaging
+8. Documentation
+
+== Gathering Results
+
+Evaluation of the `gnedby` tool will focus on the following criteria:
+
+- Correctness: Is metadata accurately retrieved and stored?
+- Usability: Are CLI commands and options intuitive and responsive?
+- Performance: Are operations fast, even with large datasets?
+- Portability: Does it run on macOS and Linux without issues?
+- Sync Safety: Does sync logic prevent overwrites and allow safe use across multiple devices?
+- Extendability: Can new sources or formats be integrated easily?
+
+User testing over a 2–4 week period will guide refinements.
