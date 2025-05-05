@@ -36,6 +36,10 @@ pub enum Command {
         /// Filter albums by format (CD or LP)
         #[arg(long)]
         format: Option<String>,
+
+        /// Filter albums by country
+        #[arg(long)]
+        country: Option<String>,
     },
     /// Generate a summary report of your collection
     Report {
@@ -54,6 +58,10 @@ pub enum Command {
         /// Filter report by format (CD or LP)
         #[arg(long)]
         format: Option<String>,
+
+        /// Filter report by country
+        #[arg(long)]
+        country: Option<String>,
     },
     /// Synchronize your collection with remote storage
     Sync {
