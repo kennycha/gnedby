@@ -1,4 +1,4 @@
-# gnedby
+# GNEDBY
 
 A CLI tool for managing your CD/LP collection. Easily add album information using Apple Music links, view lists and summary reports with various filters, and support synchronization using Supabase.
 

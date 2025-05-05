@@ -4,6 +4,7 @@ mod metadata;
 
 use anyhow::Result;
 use cli::{parse_args, Command};
+use comfy_table::{presets::UTF8_BORDERS_ONLY, Cell, CellAlignment, ContentArrangement, Table};
 use db::{Album, Database};
 use metadata::fetch_album_metadata;
 
@@ -29,18 +30,14 @@ async fn run() -> Result<()> {
                 album: metadata.album,
                 genre: metadata.genre,
                 release_date: metadata.release_date,
-                format,
+                format: format.to_lowercase(),
                 source_url: metadata.source_url,
                 country: metadata.country,
                 artwork_url: metadata.artwork_url,
             };
 
-            let id = db.add_album(&album)?;
-
-            println!(
-                "Added album \"{}\" by \"{}\" with ID: {}",
-                album.album, album.artist, id
-            );
+            db.add_album(&album)?;
+            println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
         }
         Command::Show {
             year,
@@ -48,12 +45,73 @@ async fn run() -> Result<()> {
             genre,
             format,
             country,
+            order_by,
         } => {
-            println!(
-                "Showing albums with filters: year={:?}, artist={:?}, genre={:?}, format={:?}, country={:?}",
-                year, artist, genre, format, country
-            );
-            // TODO: 데이터베이스에서 앨범 목록 가져오기
+            let filter_msg = if let Some(year) = year {
+                format!("by year: {}", year)
+            } else if let Some(artist) = &artist {
+                format!("by artist: {}", artist)
+            } else if let Some(genre) = &genre {
+                format!("by genre: {}", genre)
+            } else if let Some(format) = &format {
+                format!("by format: {}", format)
+            } else if let Some(country) = &country {
+                format!("by country: {}", country)
+            } else {
+                "all albums".to_string()
+            };
+
+            let artist_ref = artist.as_deref();
+            let genre_ref = genre.as_deref();
+            let format_ref = format.as_deref();
+            let country_ref = country.as_deref();
+            let order_by_ref = order_by.as_deref();
+
+            let albums = db.list_albums(
+                year,
+                artist_ref,
+                genre_ref,
+                format_ref,
+                country_ref,
+                order_by_ref,
+            )?;
+
+            if albums.is_empty() {
+                println!("No albums found in my GNEDBY {}", filter_msg);
+                return Ok(());
+            }
+
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_BORDERS_ONLY)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_header(vec![
+                    Cell::new("ID").set_alignment(CellAlignment::Center),
+                    Cell::new("Album").set_alignment(CellAlignment::Center),
+                    Cell::new("Artist").set_alignment(CellAlignment::Center),
+                    Cell::new("Genre").set_alignment(CellAlignment::Center),
+                    Cell::new("Country").set_alignment(CellAlignment::Center),
+                    Cell::new("Format").set_alignment(CellAlignment::Center),
+                    Cell::new("Year").set_alignment(CellAlignment::Center),
+                ]);
+
+            for album in &albums {
+                let year = extract_year(&album.release_date);
+
+                table.add_row(vec![
+                    Cell::new(album.id.unwrap_or(0).to_string()),
+                    Cell::new(&album.album),
+                    Cell::new(&album.artist),
+                    Cell::new(&album.genre),
+                    Cell::new(&album.country),
+                    Cell::new(&album.format),
+                    Cell::new(year),
+                ]);
+            }
+
+            println!("In my GNEDBY, {}", filter_msg);
+            println!("{table}");
+            println!("{} album(s) found", albums.len());
         }
         Command::Report {
             year,
@@ -62,17 +120,36 @@ async fn run() -> Result<()> {
             format,
             country,
         } => {
-            println!(
-                "Generating report with filters: year={:?}, artist={:?}, genre={:?}, format={:?}, country={:?}",
-                year, artist, genre, format, country
-            );
-            // TODO: 데이터베이스에서 보고서 생성
+            let filter_msg = if let Some(year) = year {
+                format!("for year: {}", year)
+            } else if let Some(artist) = &artist {
+                format!("for artist: {}", artist)
+            } else if let Some(genre) = &genre {
+                format!("for genre: {}", genre)
+            } else if let Some(format) = &format {
+                format!("for format: {}", format)
+            } else if let Some(country) = &country {
+                format!("for country: {}", country)
+            } else {
+                "for all albums".to_string()
+            };
+
+            println!("Generating report in my GNEDBY {}", filter_msg);
         }
         Command::Sync { command } => {
             println!("Sync command: {:?}", command);
-            // TODO: 동기화 기능 구현
         }
     }
 
     Ok(())
+}
+
+fn extract_year(date_str: &str) -> &str {
+    if let Some(idx) = date_str.find('-') {
+        &date_str[0..idx]
+    } else if date_str.len() >= 4 {
+        &date_str[0..4]
+    } else {
+        date_str
+    }
 }

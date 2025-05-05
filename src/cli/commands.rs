@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 
 /// A CLI tool for managing your CD/LP collection
 #[derive(Parser, Debug)]
@@ -19,7 +19,13 @@ pub enum Command {
         #[arg(long, default_value = "cd")]
         format: String,
     },
-    /// List albums in your collection with optional filters
+    /// List albums in your collection with optional filters (use only one filter at a time)
+    #[command(group(
+        ArgGroup::new("filter")
+            .args(["year", "artist", "genre", "format", "country"])
+            .multiple(false)
+            .required(false)
+    ))]
     Show {
         /// Filter albums by release year
         #[arg(long)]
@@ -40,8 +46,18 @@ pub enum Command {
         /// Filter albums by country
         #[arg(long)]
         country: Option<String>,
+
+        /// Order results by field (id, album, artist, year)
+        #[arg(long, default_value = "id")]
+        order_by: Option<String>,
     },
     /// Generate a summary report of your collection
+    #[command(group(
+        ArgGroup::new("filter")
+            .args(["year", "artist", "genre", "format", "country"])
+            .multiple(false)
+            .required(false)
+    ))]
     Report {
         /// Filter report by release year
         #[arg(long)]
