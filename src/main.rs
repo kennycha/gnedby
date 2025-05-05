@@ -15,6 +15,72 @@ fn main() {
     }
 }
 
+fn create_bar_chart_table<T: AsRef<str> + std::fmt::Display>(
+    stats: Vec<(T, i64)>,
+    title: &str,
+    column_name: &str,
+) -> Result<()> {
+    if stats.is_empty() {
+        println!("No albums found in my GNEDBY");
+        return Ok(());
+    }
+
+    println!("\n                         {}\n", title);
+
+    let max_count = stats.iter().map(|(_, count)| *count).max().unwrap_or(0);
+    let max_bar_length = 50;
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_BORDERS_ONLY)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new(column_name).set_alignment(CellAlignment::Left),
+            Cell::new("Count").set_alignment(CellAlignment::Left),
+            Cell::new("Bar").set_alignment(CellAlignment::Left),
+        ]);
+
+    for (item, count) in stats {
+        let bar_length =
+            ((count as f64 / max_count as f64) * max_bar_length as f64).round() as usize;
+        let bar = "▄".repeat(bar_length);
+
+        table.add_row(vec![
+            Cell::new(item),
+            Cell::new(count.to_string()),
+            Cell::new(bar),
+        ]);
+    }
+
+    println!("{table}");
+    Ok(())
+}
+
+fn create_artist_table(stats: Vec<(String, i64)>) -> Result<()> {
+    if stats.is_empty() {
+        println!("No albums found in my GNEDBY");
+        return Ok(());
+    }
+
+    println!("\n         Most Popular Artists\n");
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_BORDERS_ONLY)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("Artist").set_alignment(CellAlignment::Left),
+            Cell::new("Albums Count").set_alignment(CellAlignment::Left),
+        ]);
+
+    for (artist, count) in stats.iter().take(13) {
+        table.add_row(vec![Cell::new(artist), Cell::new(count.to_string())]);
+    }
+
+    println!("{table}");
+    Ok(())
+}
+
 #[tokio::main]
 async fn run() -> Result<()> {
     let cli = parse_args()?;
@@ -114,27 +180,28 @@ async fn run() -> Result<()> {
             println!("{} album(s) found", albums.len());
         }
         Command::Report {
-            year,
+            year: _,
             artist,
             genre,
             format,
             country,
         } => {
-            let filter_msg = if let Some(year) = year {
-                format!("for year: {}", year)
-            } else if let Some(artist) = &artist {
-                format!("for artist: {}", artist)
-            } else if let Some(genre) = &genre {
-                format!("for genre: {}", genre)
-            } else if let Some(format) = &format {
-                format!("for format: {}", format)
-            } else if let Some(country) = &country {
-                format!("for country: {}", country)
+            if artist {
+                let artist_stats = db.get_artist_stats()?;
+                create_artist_table(artist_stats)?;
+            } else if genre {
+                let genre_stats = db.get_genre_stats()?;
+                create_bar_chart_table(genre_stats, "Albums by Genre", "Genre")?;
+            } else if format {
+                let format_stats = db.get_format_stats()?;
+                create_bar_chart_table(format_stats, "Albums by Format", "Format")?;
+            } else if country {
+                let country_stats = db.get_country_stats()?;
+                create_bar_chart_table(country_stats, "Albums by Country", "Country")?;
             } else {
-                "for all albums".to_string()
-            };
-
-            println!("Generating report in my GNEDBY {}", filter_msg);
+                let year_stats = db.get_year_stats()?;
+                create_bar_chart_table(year_stats, "Albums by Year", "Year")?;
+            }
         }
         Command::Sync { command } => {
             println!("Sync command: {:?}", command);

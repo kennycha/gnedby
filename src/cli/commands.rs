@@ -60,24 +60,24 @@ pub enum Command {
     ))]
     Report {
         /// Filter report by release year
-        #[arg(long)]
-        year: Option<i32>,
+        #[arg(long, default_value_t = true)]
+        year: bool,
 
         /// Filter report by artist name
         #[arg(long)]
-        artist: Option<String>,
+        artist: bool,
 
         /// Filter report by genre
         #[arg(long)]
-        genre: Option<String>,
+        genre: bool,
 
         /// Filter report by format (CD or LP)
         #[arg(long)]
-        format: Option<String>,
+        format: bool,
 
         /// Filter report by country
         #[arg(long)]
-        country: Option<String>,
+        country: bool,
     },
     /// Synchronize your collection with remote storage
     Sync {

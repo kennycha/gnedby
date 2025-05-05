@@ -135,4 +135,119 @@ impl Database {
 
         Ok(albums)
     }
+
+    pub fn get_artist_stats(&self) -> Result<Vec<(String, i64)>> {
+        let sql = "
+            SELECT artist, COUNT(*) as count 
+            FROM albums 
+            GROUP BY artist 
+            ORDER BY count DESC
+        ";
+
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map([], |row| {
+            let artist: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+            Ok((artist, count))
+        })?;
+
+        let mut stats = Vec::new();
+        for row_result in rows {
+            stats.push(row_result?);
+        }
+
+        Ok(stats)
+    }
+
+    pub fn get_year_stats(&self) -> Result<Vec<(String, i64)>> {
+        let sql = "
+            SELECT strftime('%Y', release_date) as year, COUNT(*) as count 
+            FROM albums 
+            GROUP BY year 
+            ORDER BY year ASC
+        ";
+
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map([], |row| {
+            let year: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+            Ok((year, count))
+        })?;
+
+        let mut stats = Vec::new();
+        for row_result in rows {
+            stats.push(row_result?);
+        }
+
+        Ok(stats)
+    }
+
+    pub fn get_genre_stats(&self) -> Result<Vec<(String, i64)>> {
+        let sql = "
+            SELECT genre, COUNT(*) as count 
+            FROM albums 
+            GROUP BY genre 
+            ORDER BY count DESC
+        ";
+
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map([], |row| {
+            let genre: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+            Ok((genre, count))
+        })?;
+
+        let mut stats = Vec::new();
+        for row_result in rows {
+            stats.push(row_result?);
+        }
+
+        Ok(stats)
+    }
+
+    pub fn get_format_stats(&self) -> Result<Vec<(String, i64)>> {
+        let sql = "
+            SELECT format, COUNT(*) as count 
+            FROM albums 
+            GROUP BY format 
+            ORDER BY count DESC
+        ";
+
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map([], |row| {
+            let format: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+            Ok((format, count))
+        })?;
+
+        let mut stats = Vec::new();
+        for row_result in rows {
+            stats.push(row_result?);
+        }
+
+        Ok(stats)
+    }
+
+    pub fn get_country_stats(&self) -> Result<Vec<(String, i64)>> {
+        let sql = "
+            SELECT country, COUNT(*) as count 
+            FROM albums 
+            GROUP BY country 
+            ORDER BY count DESC
+        ";
+
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map([], |row| {
+            let country: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+            Ok((country, count))
+        })?;
+
+        let mut stats = Vec::new();
+        for row_result in rows {
+            stats.push(row_result?);
+        }
+
+        Ok(stats)
+    }
 }
