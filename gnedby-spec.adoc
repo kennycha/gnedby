@@ -11,18 +11,21 @@ gnedby is a command-line tool for managing your CD/LP collection. It allows you 
 
 - Must Have
   * User can add a music album by providing an Apple Music album ID
-  * Album metadata (artist, album title, genre, release date) is fetched automatically
+  * Album metadata (artist, album title, genre, release date, country, artwork) is fetched automatically
   * Support for optional `--format lp` flag (default is CD)
-  * List (`show`) and summary report (`report`) commands with filters: year, artist, genre, format
+  * List (`show`) and summary report (`report`) commands with filters: year, artist, genre, format, country
   * Local persistent storage using SQLite
   * Sync command structure with check/push/pull support
+  * Secure token storage using system keychain
 
 - Should Have
   * Extensible CLI architecture (e.g. to support Bandcamp in future)
   * Pretty CLI output (table formatting, optional colors)
+  * Order by options for album listings
 
 - Could Have
   * Config file for defaults
+  * Automated backups during sync operations
 
 - Won't Have (initially)
   * Price tracking
@@ -30,7 +33,7 @@ gnedby is a command-line tool for managing your CD/LP collection. It allows you 
 
 == Method
 
-The CLI is implemented in Rust, using `clap` for command parsing, `rusqlite` for database interactions, and `reqwest` for HTTP-based metadata extraction. The architecture includes the following components:
+The CLI is implemented in Rust, using `clap` for command parsing, `rusqlite` for database interactions, `reqwest` for HTTP-based metadata extraction, and `keyring` for secure token storage. The architecture includes the following components:
 
 [plantuml]
 ----
@@ -42,12 +45,14 @@ MetadataFetcher -> AppleMusic : GET album info
 AppleMusic --> MetadataFetcher : JSON response
 MetadataFetcher -> CLI : Album metadata
 CLI -> Database : INSERT INTO albums (...)
-User -> CLI : show [--year] [--artist] [--genre] [--format]
-User -> CLI : report [--year] [--genre] [--format]
+User -> CLI : show [--year] [--artist] [--genre] [--format] [--country] [--order-by]
+User -> CLI : report [--year] [--artist] [--genre] [--format] [--country]
 User -> CLI : sync check | pull | push
 CLI -> RemoteStore : Compare local vs remote meta.json
 RemoteStore --> CLI : metadata JSON
 CLI -> RemoteStore : Upload/Download albums.db
+User -> CLI : sync config show | set | reset
+CLI -> SecureStorage : Store/retrieve tokens
 @enduml
 ----
 
@@ -56,11 +61,14 @@ CLI -> RemoteStore : Upload/Download albums.db
 [source,bash]
 ----
 gnedby add <album_id> [--format lp]
-gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>]
-gnedby report [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>]
+gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>] [--country <country>] [--order-by id|album|artist|year]
+gnedby report [--year] [--artist] [--genre] [--format] [--country]
 gnedby sync check
 gnedby sync pull
 gnedby sync push
+gnedby sync config show
+gnedby sync config set <key> <value>
+gnedby sync config reset
 ----
 
 === Database Schema
@@ -74,7 +82,9 @@ CREATE TABLE albums (
     genre TEXT,
     release_date TEXT,
     format TEXT DEFAULT 'CD',
-    source_url TEXT NOT NULL
+    source_url TEXT,
+    country TEXT,
+    artwork_url TEXT
 );
 ----
 
@@ -93,6 +103,8 @@ This returns a JSON object from which the following fields are extracted:
 - `collectionName`
 - `releaseDate`
 - `primaryGenreName`
+- `country`
+- `artworkUrl100`
 
 === Sync Implementation
 
@@ -101,32 +113,44 @@ Sync follows a push/pull model with `check` support.
 - Local file: `albums.db`
 - Remote file: `albums.db` + `meta.json`
 - Sync Steps:
-  * `check`: Compare SHA256 hash or last modified timestamp
-  * `push`: Upload DB and metadata to S3, Dropbox or similar
-  * `pull`: Download and overwrite local DB (with backup)
-
-
+  * `check`: Compare SHA256 hash with remote metadata
+  * `push`: Upload DB and metadata to Supabase Storage
+  * `pull`: Download and overwrite local DB (with automatic backup)
+  * `backup`: Create backup of database before overwriting
 
 === Configuration System
 
-Users must configure their Supabase Storage target and token before using sync commands. This is done using the `gnedby config` command.
+Users must configure their Supabase Storage target and token before using sync commands. This is done using the `gnedby sync config` command.
 
 ==== Supported Keys
 
-- `storage_url` – Supabase bucket base URL (e.g. `https://<project>.supabase.co/storage/v1/object/gnedby-sync`)
-- `token` – Supabase access token (User JWT or Service Role)
+- `storage_url` – Supabase bucket base URL (e.g. `https://<project-id>.supabase.co/storage/v1/object/gnedby-sync`)
+- `token` – Supabase access token (service_role token recommended)
+- `auto_sync` – Boolean flag for automatic sync (default: false)
 
 ==== Example Usage
 
 [source,bash]
 ----
-gnedby config set storage_url https://project.supabase.co/storage/v1/object/gnedby-sync
-gnedby config set token sbp_xxxxxxx
+gnedby sync config set storage_url https://project-id.supabase.co/storage/v1/object/gnedby-sync
+gnedby sync config set token eyJhbGciOiJIUzI1NiIsInR5cCI...
+gnedby sync config set auto_sync true
 
-gnedby config get storage_url
+gnedby sync config show
+gnedby sync config reset
 ----
 
-These are stored in `~/.gnedby/config.json` and used by all sync commands.
+Configuration settings are stored in `~/.config/gnedby/sync_config.json`, with tokens securely stored in the system keychain/credential manager.
+
+=== Secure Token Storage
+
+For security, authentication tokens are stored in the system's secure credential store:
+
+- macOS: Apple Keychain
+- Windows: Windows Credential Manager
+- Linux: Secret Service API / libsecret
+
+This prevents sensitive tokens from being stored as plaintext in configuration files.
 
 === Supabase Sync Implementation
 
@@ -135,27 +159,28 @@ For multi-device usage and safe synchronization, gnedby uses Supabase Storage as
 ==== Structure
 
 Supabase bucket: `gnedby-sync`
-- `albums/albums.db` - Main SQLite database file
-- `albums/meta.json` - Metadata used for safe syncing
+- `albums.db` - Main SQLite database file
+- `meta.json` - Metadata used for safe syncing
 
 meta.json example:
 [source,json]
 ----
 {
   "hash": "d4c3b4a1f2e1...",
-  "last_modified": "2025-05-03T15:30:00Z"
+  "last_sync": "2025-05-03T15:30:00Z"
 }
 ----
 
 ==== Authentication
 
-User runs:
+The user must obtain a Supabase token (preferably service_role) from the Supabase dashboard and configure it:
+
 [source,bash]
 ----
-gnedby login <supabase_token>
+gnedby sync config set token <supabase_token>
 ----
 
-Token is stored in `~/.gnedby/config.json` for subsequent operations.
+The token is securely stored in the system's credential manager.
 
 ==== CLI Commands
 
@@ -175,7 +200,8 @@ gnedby sync push
 - `reqwest` for HTTP requests
 - `serde_json` for JSON encoding/decoding
 - `sha2` for hash comparison
-- Supabase REST API or S3-compatible endpoints for file handling
+- `keyring` for secure credential storage
+- Supabase Storage REST API endpoints for file handling
 
 == Implementation
 
@@ -183,21 +209,25 @@ gnedby sync push
 2. API Integration with Apple Music (iTunes Search API)
 3. Database Initialization using rusqlite
 4. Metadata Fetch + Insert Logic
-5. `show` and `report` Command Filters
+5. `show` and `report` Command Filters with various sorting options
 6. Sync Subcommand: check, pull, push (with hash comparison)
-7. Packaging and Cross-platform Testing
-8. Documentation and README
+7. Secure token storage using system keychain
+8. Configuration management with reset option
+9. Automatic database backups during sync operations
+10. Error handling and user-friendly messages
+11. Documentation and README
 
 == Milestones
 
-1. CLI Setup and Argument Parsing
-2. API Integration
-3. Database Setup
-4. `add` Command Logic
-5. `show` and `report` Commands
-6. Sync Functionality (check, pull, push)
-7. Packaging
-8. Documentation
+1. CLI Setup and Argument Parsing ✓
+2. API Integration ✓
+3. Database Setup ✓
+4. `add` Command Logic ✓
+5. `show` and `report` Commands ✓
+6. Sync Configuration Management ✓
+7. Secure Token Storage ✓
+8. Sync Functionality (check, pull, push) ✓
+9. Documentation ✓
 
 == Gathering Results
 
@@ -206,8 +236,9 @@ Evaluation of the `gnedby` tool will focus on the following criteria:
 - Correctness: Is metadata accurately retrieved and stored?
 - Usability: Are CLI commands and options intuitive and responsive?
 - Performance: Are operations fast, even with large datasets?
-- Portability: Does it run on macOS and Linux without issues?
+- Portability: Does it run on macOS, Windows, and Linux without issues?
 - Sync Safety: Does sync logic prevent overwrites and allow safe use across multiple devices?
+- Security: Are credentials stored securely without plaintext exposure?
 - Extendability: Can new sources or formats be integrated easily?
 
 User testing over a 2–4 week period will guide refinements.
