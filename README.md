@@ -9,8 +9,10 @@ A CLI tool for managing your CD/LP collection. Easily add album information usin
 - CD/LP format support (`--format lp` flag)
 - List view and summary reports with various filters
 - Local persistent storage using SQLite
-- Secure token storage using system keychain
+- Token storage with encryption
 - Synchronization with Supabase (check/push/pull)
+- Automatic synchronization when adding new albums (optional)
+- Removal of albums from your collection
 
 ## Installation
 
@@ -24,6 +26,12 @@ cargo install gnedby
 
 ```bash
 gnedby add <album_id> [--format lp]
+```
+
+### Deleting Albums
+
+```bash
+gnedby delete <id>
 ```
 
 ### Viewing Albums
@@ -78,9 +86,17 @@ gnedby sync push
 
 3. On other devices, configure the same settings and use `gnedby sync pull` to get your data.
 
+4. Enable automatic synchronization (optional):
+
+```bash
+gnedby sync config set auto_sync true
+```
+
+With automatic synchronization enabled, any newly added or deleted albums will be automatically pushed to your Supabase storage. This ensures your collection is always backed up without manual intervention.
+
 ## Security Features
 
-- Tokens are securely stored in your system's keychain/credential store
+- Tokens are stored with XOR encryption using a machine-specific key
 - Database backups are created automatically before sync operations
 - Integrity checking with SHA-256 hashes
 
@@ -90,7 +106,7 @@ gnedby sync push
 - clap (CLI parsing)
 - rusqlite (database)
 - reqwest (HTTP requests)
-- keyring (secure token storage)
+- base64 and SHA-256 (token encryption)
 - Supabase Storage (synchronization)
 
 ## License

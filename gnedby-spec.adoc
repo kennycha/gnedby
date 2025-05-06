@@ -33,7 +33,7 @@ gnedby is a command-line tool for managing your CD/LP collection. It allows you 
 
 == Method
 
-The CLI is implemented in Rust, using `clap` for command parsing, `rusqlite` for database interactions, `reqwest` for HTTP-based metadata extraction, and `keyring` for secure token storage. The architecture includes the following components:
+The CLI is implemented in Rust, using `clap` for command parsing, `rusqlite` for database interactions, `reqwest` for HTTP-based metadata extraction, and encrypted token storage. The architecture includes the following components:
 
 [plantuml]
 ----
@@ -45,6 +45,8 @@ MetadataFetcher -> AppleMusic : GET album info
 AppleMusic --> MetadataFetcher : JSON response
 MetadataFetcher -> CLI : Album metadata
 CLI -> Database : INSERT INTO albums (...)
+User -> CLI : delete <id>
+CLI -> Database : DELETE FROM albums WHERE id = ?
 User -> CLI : show [--year] [--artist] [--genre] [--format] [--country] [--order-by]
 User -> CLI : report [--year] [--artist] [--genre] [--format] [--country]
 User -> CLI : sync check | pull | push
@@ -52,7 +54,7 @@ CLI -> RemoteStore : Compare local vs remote meta.json
 RemoteStore --> CLI : metadata JSON
 CLI -> RemoteStore : Upload/Download albums.db
 User -> CLI : sync config show | set | reset
-CLI -> SecureStorage : Store/retrieve tokens
+CLI -> EncryptedStorage : Store/retrieve tokens
 @enduml
 ----
 
@@ -61,6 +63,7 @@ CLI -> SecureStorage : Store/retrieve tokens
 [source,bash]
 ----
 gnedby add <album_id> [--format lp]
+gnedby delete <id>
 gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>] [--country <country>] [--order-by id|album|artist|year]
 gnedby report [--year] [--artist] [--genre] [--format] [--country]
 gnedby sync check
@@ -144,13 +147,14 @@ Configuration settings are stored in `~/.config/gnedby/sync_config.json`, with t
 
 === Secure Token Storage
 
-For security, authentication tokens are stored in the system's secure credential store:
+For security, authentication tokens are stored with encryption:
 
-- macOS: Apple Keychain
-- Windows: Windows Credential Manager
-- Linux: Secret Service API / libsecret
+- XOR encryption with a machine-specific key
+- Base64 encoding for storage
+- SHA-256 to generate the encryption key from machine-specific information
+- Stored in the application's configuration file but in encrypted form
 
-This prevents sensitive tokens from being stored as plaintext in configuration files.
+This prevents sensitive tokens from being easily readable in configuration files.
 
 === Supabase Sync Implementation
 
@@ -180,7 +184,7 @@ The user must obtain a Supabase token (preferably service_role) from the Supabas
 gnedby sync config set token <supabase_token>
 ----
 
-The token is securely stored in the system's credential manager.
+The token is securely stored with encryption in the configuration file.
 
 ==== CLI Commands
 
@@ -199,8 +203,8 @@ gnedby sync push
 
 - `reqwest` for HTTP requests
 - `serde_json` for JSON encoding/decoding
-- `sha2` for hash comparison
-- `keyring` for secure credential storage
+- `sha2` for hash comparison and encryption
+- `base64` for token encoding/decoding
 - Supabase Storage REST API endpoints for file handling
 
 == Implementation
@@ -210,12 +214,14 @@ gnedby sync push
 3. Database Initialization using rusqlite
 4. Metadata Fetch + Insert Logic
 5. `show` and `report` Command Filters with various sorting options
-6. Sync Subcommand: check, pull, push (with hash comparison)
-7. Secure token storage using system keychain
-8. Configuration management with reset option
-9. Automatic database backups during sync operations
-10. Error handling and user-friendly messages
-11. Documentation and README
+6. `delete` Command Implementation
+7. Sync Subcommand: check, pull, push (with hash comparison)
+8. Token encryption using machine-specific keys
+9. Configuration management with reset option
+10. Automatic database backups during sync operations
+11. Auto-sync capability for add/delete operations
+12. Error handling and user-friendly messages
+13. Documentation and README
 
 == Milestones
 
@@ -238,7 +244,7 @@ Evaluation of the `gnedby` tool will focus on the following criteria:
 - Performance: Are operations fast, even with large datasets?
 - Portability: Does it run on macOS, Windows, and Linux without issues?
 - Sync Safety: Does sync logic prevent overwrites and allow safe use across multiple devices?
-- Security: Are credentials stored securely without plaintext exposure?
+- Security: Are tokens properly encrypted and protected from casual access?
 - Extendability: Can new sources or formats be integrated easily?
 
 User testing over a 2–4 week period will guide refinements.
