@@ -107,7 +107,31 @@ async fn run() -> Result<()> {
 
             db.add_album(&album)?;
             println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
+
+            let config = load_config()?;
+            if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {
+                match sync::auto_sync().await {
+                    Ok(_) => println!("Auto sync completed successfully"),
+                    Err(e) => eprintln!("Auto sync failed: {}", e),
+                }
+            }
         }
+        Command::Delete { id } => match db.delete_album(id) {
+            Ok(_) => {
+                println!("Album with ID {} deleted successfully", id);
+
+                let config = load_config()?;
+                if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {
+                    match sync::auto_sync().await {
+                        Ok(_) => println!("Auto sync completed successfully"),
+                        Err(e) => eprintln!("Auto sync failed: {}", e),
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to delete album: {}", e);
+            }
+        },
         Command::Show {
             year,
             artist,
@@ -242,6 +266,16 @@ async fn run() -> Result<()> {
                             let auto_sync = value.to_lowercase() == "true";
                             config.auto_sync = auto_sync;
                             println!("Set auto_sync to: {}", auto_sync);
+
+                            if auto_sync {
+                                println!("Auto sync is enabled. Albums will be synced to the remote storage automatically.");
+
+                                if config.storage_url.is_none() || config.token.is_none() {
+                                    println!("Warning: Sync configuration is not complete. Please set storage_url and token.");
+                                }
+                            } else {
+                                println!("Auto sync is disabled. Manual sync is required with 'gnedby sync push' command.");
+                            }
                         }
                         _ => {
                             println!("Unknown sync configuration key: {}", key);
@@ -251,8 +285,6 @@ async fn run() -> Result<()> {
                     save_config(&config)?;
                 }
                 SyncConfigCommand::Reset => {
-                    config::delete_token()?;
-
                     let default_config = config::SyncConfig::default();
                     save_config(&default_config)?;
 

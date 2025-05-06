@@ -19,6 +19,11 @@ pub enum Command {
         #[arg(long, default_value = "cd")]
         format: String,
     },
+    /// Delete an album from your collection by ID
+    Delete {
+        /// Album ID to delete
+        id: i64,
+    },
     /// List albums in your collection with optional filters (use only one filter at a time)
     #[command(group(
         ArgGroup::new("filter")

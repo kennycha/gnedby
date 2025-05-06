@@ -17,5 +17,5 @@ thiserror = "2.0.12"
 chrono = "0.4"
 directories = "6.0"
 comfy-table = "7.1"
-keyring = { version = "3.6", features = ["apple-native", "windows-native"] }
 sha2 = "0.10"
+base64 = "0.22"

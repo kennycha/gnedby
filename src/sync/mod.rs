@@ -221,3 +221,25 @@ fn create_client(token: &str) -> Result<Client> {
 
     Ok(client)
 }
+
+pub async fn auto_sync() -> Result<()> {
+    let config = load_config()?;
+
+    if !config.auto_sync {
+        println!("Auto sync is disabled in configuration");
+        return Ok(());
+    }
+
+    if config.storage_url.is_none() || config.token.is_none() {
+        println!("Auto sync is enabled but storage_url or token is missing");
+        return Ok(());
+    }
+
+    match push_to_remote().await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!("Auto sync failed during push_to_remote: {}", e);
+            Err(e)
+        }
+    }
+}

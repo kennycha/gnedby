@@ -53,7 +53,9 @@ impl Database {
                 &album.artwork_url,
             ),
         )?;
-        Ok(self.conn.last_insert_rowid())
+        let id = self.conn.last_insert_rowid();
+
+        Ok(id)
     }
 
     pub fn list_albums(
@@ -246,6 +248,16 @@ impl Database {
         }
 
         Ok(stats)
+    }
+
+    pub fn delete_album(&self, id: i64) -> Result<()> {
+        let rows_affected = self.conn.execute("DELETE FROM albums WHERE id = ?", [id])?;
+
+        if rows_affected == 0 {
+            return Err(anyhow::anyhow!("Album with ID {} not found", id));
+        }
+
+        Ok(())
     }
 }
 
