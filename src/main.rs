@@ -1,10 +1,13 @@
 mod cli;
+mod config;
 mod db;
 mod metadata;
+mod sync;
 
 use anyhow::Result;
-use cli::{parse_args, Command};
+use cli::{parse_args, Command, SyncCommand, SyncConfigCommand};
 use comfy_table::{presets::UTF8_BORDERS_ONLY, Cell, CellAlignment, ContentArrangement, Table};
+use config::{load_config, save_config};
 use db::{Album, Database};
 use metadata::fetch_album_metadata;
 
@@ -203,9 +206,61 @@ async fn run() -> Result<()> {
                 create_bar_chart_table(year_stats, "Albums by Year", "Year")?;
             }
         }
-        Command::Sync { command } => {
-            println!("Sync command: {:?}", command);
-        }
+        Command::Sync { command } => match command {
+            SyncCommand::Check => {
+                if sync::check_sync_status().await? {
+                    println!("Sync check completed.");
+                }
+            }
+            SyncCommand::Pull => {
+                sync::pull_from_remote().await?;
+                println!("Sync pull completed.");
+            }
+            SyncCommand::Push => {
+                sync::push_to_remote().await?;
+                println!("Sync push completed.");
+            }
+            SyncCommand::Config { command } => match command {
+                SyncConfigCommand::Show => {
+                    let config = load_config()?;
+                    println!("Current sync configuration:");
+                    println!("{}", serde_json::to_string_pretty(&config)?);
+                }
+                SyncConfigCommand::Set { key, value } => {
+                    let mut config = load_config()?;
+
+                    match key.as_str() {
+                        "storage_url" => {
+                            config.storage_url = Some(value.clone());
+                            println!("Set storage_url to: {}", value);
+                        }
+                        "token" => {
+                            config.token = Some(value.clone());
+                            println!("Set token to: {}", value);
+                        }
+                        "auto_sync" => {
+                            let auto_sync = value.to_lowercase() == "true";
+                            config.auto_sync = auto_sync;
+                            println!("Set auto_sync to: {}", auto_sync);
+                        }
+                        _ => {
+                            println!("Unknown sync configuration key: {}", key);
+                        }
+                    }
+
+                    save_config(&config)?;
+                }
+                SyncConfigCommand::Reset => {
+                    config::delete_token()?;
+
+                    let default_config = config::SyncConfig::default();
+                    save_config(&default_config)?;
+
+                    println!("Sync configuration has been reset to default values.");
+                    println!("Token has been removed from secure storage.");
+                }
+            },
+        },
     }
 
     Ok(())

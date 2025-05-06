@@ -94,4 +94,24 @@ pub enum SyncCommand {
     Pull,
     /// Upload your local changes to remote storage
     Push,
+    /// Configure sync settings
+    Config {
+        #[command(subcommand)]
+        command: SyncConfigCommand,
+    },
+}
+
+#[derive(Parser, Debug)]
+pub enum SyncConfigCommand {
+    /// Show current sync configuration
+    Show,
+    /// Set sync configuration value
+    Set {
+        /// Configuration key (e.g., storage_url, token)
+        key: String,
+        /// Configuration value
+        value: String,
+    },
+    /// Reset sync configuration to default values
+    Reset,
 }

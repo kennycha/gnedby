@@ -1,8 +1,11 @@
 use crate::db::models::Album;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use rusqlite::Connection;
+use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Read;
+use std::path::PathBuf;
 
 pub struct Database {
     conn: Connection,
@@ -10,13 +13,7 @@ pub struct Database {
 
 impl Database {
     pub fn new() -> Result<Self> {
-        let project_dirs = ProjectDirs::from("com", "gnedby", "gnedby")
-            .ok_or_else(|| anyhow::anyhow!("Failed to determine data directory"))?;
-
-        let data_dir = project_dirs.data_dir();
-        fs::create_dir_all(data_dir)?;
-
-        let db_path = data_dir.join("albums.db");
+        let db_path = get_db_path()?;
         let conn = Connection::open(&db_path)?;
         let db = Database { conn };
         db.init()?;
@@ -250,4 +247,36 @@ impl Database {
 
         Ok(stats)
     }
+}
+
+pub fn get_db_path() -> Result<PathBuf> {
+    let project_dirs = ProjectDirs::from("com", "gnedby", "gnedby")
+        .ok_or_else(|| anyhow::anyhow!("Failed to determine data directory"))?;
+
+    let data_dir = project_dirs.data_dir();
+    fs::create_dir_all(data_dir)?;
+
+    let db_path = data_dir.join("albums.db");
+    Ok(db_path)
+}
+
+pub fn calculate_db_hash() -> Result<String> {
+    let db_path = get_db_path()?;
+
+    if !db_path.exists() {
+        return Ok("empty".to_string());
+    }
+
+    let mut file =
+        fs::File::open(&db_path).context(format!("Failed to open database file: {:?}", db_path))?;
+
+    let mut hasher = Sha256::new();
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)
+        .context("Failed to read database file")?;
+
+    hasher.update(&buffer);
+    let result = hasher.finalize();
+
+    Ok(format!("{:x}", result))
 }
