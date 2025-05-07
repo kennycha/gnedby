@@ -2,8 +2,13 @@
 name = "gnedby"
 version = "0.1.0"
 edition = "2021"
-description = "A CLI tool for managing your CD/LP collection"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Kenny Cha <dudqn136@naver.com>"]
+description = "A CLI tool for managing your CD/LP collection using Apple Music API"
+license = "MIT"
+repository = "https://github.com/kennycha/gnedby"
+readme = "README.md"
+keywords = ["music", "collection", "apple-music", "cli"]
+categories = ["command-line-utilities", "multimedia"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
