@@ -66,7 +66,7 @@ gnedby add <album_id> [--format lp]
 gnedby delete <id>
 gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>] [--country <country>] [--order-by id|album|artist|year]
 gnedby report [--year] [--artist] [--genre] [--format] [--country]
-gnedby sync check
+gnedby sync check [-v]
 gnedby sync pull
 gnedby sync push
 gnedby sync config show
@@ -190,12 +190,13 @@ The token is securely stored with encryption in the configuration file.
 
 [source,bash]
 ----
-gnedby sync check
+gnedby sync check [-v]
 gnedby sync pull
 gnedby sync push
 ----
 
 - `check`: Compares local SHA256 hash of albums.db with remote meta.json
+  * `-v`: Shows number of added, deleted, and updated albums
 - `push`: Uploads current albums.db and updates meta.json
 - `pull`: Downloads remote albums.db and backs up local copy first
 

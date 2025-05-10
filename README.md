@@ -49,7 +49,7 @@ gnedby report [--year] [--artist] [--genre] [--format] [--country]
 ### Synchronization
 
 ```bash
-gnedby sync check
+gnedby sync check [-v|--verbose]
 gnedby sync pull
 gnedby sync push
 ```
