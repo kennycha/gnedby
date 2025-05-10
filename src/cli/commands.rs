@@ -1,3 +1,4 @@
+use crate::db::models::Format;
 use clap::{ArgGroup, Parser};
 
 /// A CLI tool for managing your CD/LP collection
@@ -10,14 +11,14 @@ pub struct Args {
 
 #[derive(Parser, Debug)]
 pub enum Command {
-    /// Add a new album to your collection using Apple Music album ID
+    /// Add new albums to your collection using Apple Music album IDs
     Add {
-        /// Apple Music album ID (e.g., 1811804666)
-        album_id: String,
+        /// Apple Music album IDs (e.g., 1811804666 1811804667 1811804668)
+        album_ids: Vec<String>,
 
-        /// Album format (CD or LP)
-        #[arg(long, default_value = "cd")]
-        format: String,
+        /// Album format (cd, lp, usb, tape)
+        #[arg(long, default_value = "cd", value_parser = parse_format)]
+        format: Format,
     },
     /// Delete an album from your collection by ID
     Delete {
@@ -44,9 +45,9 @@ pub enum Command {
         #[arg(long)]
         genre: Option<String>,
 
-        /// Filter albums by format (CD or LP)
-        #[arg(long)]
-        format: Option<String>,
+        /// Filter albums by format (cd, lp, usb, tape)
+        #[arg(long, value_parser = parse_format)]
+        format: Option<Format>,
 
         /// Filter albums by country
         #[arg(long)]
@@ -76,7 +77,7 @@ pub enum Command {
         #[arg(long)]
         genre: bool,
 
-        /// Filter report by format (CD or LP)
+        /// Filter report by format (cd, lp, usb, tape)
         #[arg(long)]
         format: bool,
 
@@ -119,4 +120,13 @@ pub enum SyncConfigCommand {
     },
     /// Reset sync configuration to default values
     Reset,
+}
+
+fn parse_format(s: &str) -> Result<Format, String> {
+    Format::from_str(s).ok_or_else(|| {
+        format!(
+            "Invalid format: {}. Valid formats are: cd, lp, usb, tape",
+            s
+        )
+    })
 }

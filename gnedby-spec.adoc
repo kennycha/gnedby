@@ -84,7 +84,7 @@ CREATE TABLE albums (
     album TEXT NOT NULL,
     genre TEXT,
     release_date TEXT,
-    format TEXT DEFAULT 'CD',
+    format TEXT,
     source_url TEXT,
     country TEXT,
     artwork_url TEXT

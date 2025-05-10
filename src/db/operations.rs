@@ -28,7 +28,7 @@ impl Database {
                 album TEXT NOT NULL,
                 genre TEXT,
                 release_date TEXT,
-                format TEXT DEFAULT 'CD',
+                format TEXT,
                 source_url TEXT,
                 country TEXT,
                 artwork_url TEXT
@@ -47,7 +47,7 @@ impl Database {
                 &album.album,
                 &album.genre,
                 &album.release_date,
-                &album.format,
+                &album.format.as_str(),
                 &album.source_url,
                 &album.country,
                 &album.artwork_url,

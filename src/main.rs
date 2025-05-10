@@ -90,23 +90,25 @@ async fn run() -> Result<()> {
     let db = Database::new()?;
 
     match cli.command {
-        Command::Add { album_id, format } => {
-            let metadata = fetch_album_metadata(&album_id).await?;
+        Command::Add { album_ids, format } => {
+            for album_id in album_ids {
+                let metadata = fetch_album_metadata(&album_id).await?;
 
-            let album = Album {
-                id: None,
-                artist: metadata.artist,
-                album: metadata.album,
-                genre: metadata.genre,
-                release_date: metadata.release_date,
-                format: format.to_lowercase(),
-                source_url: metadata.source_url,
-                country: metadata.country,
-                artwork_url: metadata.artwork_url,
-            };
+                let album = Album {
+                    id: None,
+                    artist: metadata.artist,
+                    album: metadata.album,
+                    genre: metadata.genre,
+                    release_date: metadata.release_date,
+                    format,
+                    source_url: metadata.source_url,
+                    country: metadata.country,
+                    artwork_url: metadata.artwork_url,
+                };
 
-            db.add_album(&album)?;
-            println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
+                db.add_album(&album)?;
+                println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
+            }
 
             let config = load_config()?;
             if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {
@@ -156,7 +158,7 @@ async fn run() -> Result<()> {
 
             let artist_ref = artist.as_deref();
             let genre_ref = genre.as_deref();
-            let format_ref = format.as_deref();
+            let format_ref = format.as_ref().map(|f| f.as_str());
             let country_ref = country.as_deref();
             let order_by_ref = order_by.as_deref();
 
@@ -197,7 +199,7 @@ async fn run() -> Result<()> {
                     Cell::new(&album.artist),
                     Cell::new(&album.genre),
                     Cell::new(&album.country),
-                    Cell::new(&album.format),
+                    Cell::new(album.format.as_str()),
                     Cell::new(year),
                 ]);
             }

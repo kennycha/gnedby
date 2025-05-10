@@ -1,6 +1,7 @@
 use crate::config::load_config;
 use crate::db::calculate_db_hash;
 use crate::db::get_db_path;
+
 use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};

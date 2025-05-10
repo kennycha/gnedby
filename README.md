@@ -1,12 +1,12 @@
 # GNEDBY
 
-A CLI tool for managing your CD/LP collection. Easily add album information using Apple Music links, view lists and summary reports with various filters, and support synchronization using Supabase.
+A CLI tool for managing your CD/LP/USB/Tape collection. Easily add album information using Apple Music links, view lists and summary reports with various filters, and support synchronization using Supabase.
 
 ## Features
 
 - Add music albums using Apple Music album IDs
 - Automatic album metadata fetching (artist, album title, genre, release date, country, artwork)
-- CD/LP format support (`--format lp` flag)
+- CD/LP/USB/Tape format support (`--format` flag)
 - List view and summary reports with various filters
 - Local persistent storage using SQLite
 - Token storage with encryption
@@ -25,7 +25,7 @@ cargo install gnedby
 ### Adding Albums
 
 ```bash
-gnedby add <album_id> [--format lp]
+gnedby add <album_id>... [--format lp]
 ```
 
 ### Deleting Albums
@@ -37,7 +37,7 @@ gnedby delete <id>
 ### Viewing Albums
 
 ```bash
-gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>] [--country <country>] [--order-by id|album|artist|year]
+gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <cd|lp|usb|tape>] [--country <country>] [--order-by id|album|artist|year]
 ```
 
 ### Generating Reports
