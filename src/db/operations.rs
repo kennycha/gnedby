@@ -5,6 +5,7 @@ use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
+use std::path::Path;
 use std::path::PathBuf;
 
 pub struct Database {
@@ -258,6 +259,39 @@ impl Database {
         }
 
         Ok(())
+    }
+
+    pub fn get_all_albums(&self) -> Result<Vec<Album>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, artist, album, genre, release_date, format, source_url, country, artwork_url FROM albums",
+        )?;
+
+        let albums = stmt.query_map([], |row| {
+            Ok(Album {
+                id: Some(row.get(0)?),
+                artist: row.get(1)?,
+                album: row.get(2)?,
+                genre: row.get(3)?,
+                release_date: row.get(4)?,
+                format: row.get(5)?,
+                source_url: row.get(6)?,
+                country: row.get(7)?,
+                artwork_url: row.get(8)?,
+            })
+        })?;
+
+        let mut result = Vec::new();
+        for album in albums {
+            result.push(album?);
+        }
+        Ok(result)
+    }
+
+    pub fn with_path(path: &Path) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        let db = Database { conn };
+        db.init()?;
+        Ok(db)
     }
 }
 

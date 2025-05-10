@@ -95,7 +95,11 @@ pub enum Command {
 #[derive(Parser, Debug)]
 pub enum SyncCommand {
     /// Check if your local collection is in sync with remote
-    Check,
+    Check {
+        /// Show detailed changes (added, deleted, updated)
+        #[arg(short, long, default_value_t = false)]
+        verbose: bool,
+    },
     /// Download changes from remote storage
     Pull,
     /// Upload your local changes to remote storage

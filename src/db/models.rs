@@ -2,7 +2,7 @@ use rusqlite::types::{FromSql, FromSqlError, ValueRef};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub enum Format {
     Cd,
     Lp,
@@ -45,7 +45,7 @@ impl Format {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Album {
     pub id: Option<i64>,
     pub artist: String,

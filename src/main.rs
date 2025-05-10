@@ -233,8 +233,8 @@ async fn run() -> Result<()> {
             }
         }
         Command::Sync { command } => match command {
-            SyncCommand::Check => {
-                if sync::check_sync_status().await? {
+            SyncCommand::Check { verbose } => {
+                if sync::check_sync_status(verbose).await? {
                     println!("Sync check completed.");
                 }
             }

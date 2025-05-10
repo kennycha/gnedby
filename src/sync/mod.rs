@@ -1,6 +1,9 @@
 use crate::config::load_config;
 use crate::db::calculate_db_hash;
 use crate::db::get_db_path;
+use crate::db::models::Album;
+use crate::db::operations::Database;
+use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -16,7 +19,40 @@ struct SyncMetadata {
     last_sync: String,
 }
 
-pub async fn check_sync_status() -> Result<bool> {
+async fn get_remote_database(storage_url: &str, token: &str) -> Result<Vec<Album>> {
+    let db_url = format!("{}/albums.db", storage_url);
+    let client = create_client(token)?;
+
+    let response = client
+        .get(&db_url)
+        .send()
+        .await
+        .context("Failed to download remote database")?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Failed to download database: {}",
+            response.status()
+        ));
+    }
+
+    let db_content = response
+        .bytes()
+        .await
+        .context("Failed to read database content")?;
+
+    let db_path = get_db_path()?;
+    let backup_path = db_path.with_extension("db.temp");
+    fs::write(&backup_path, &db_content).context("Failed to write temporary database file")?;
+
+    let remote_db = Database::with_path(&backup_path)?;
+    let remote_albums = remote_db.get_all_albums()?;
+
+    fs::remove_file(&backup_path).ok();
+    Ok(remote_albums)
+}
+
+pub async fn check_sync_status(verbose: bool) -> Result<bool> {
     let config = load_config()?;
 
     if config.storage_url.is_none() || config.token.is_none() {
@@ -30,7 +66,6 @@ pub async fn check_sync_status() -> Result<bool> {
     let token = config.token.unwrap();
 
     let local_hash = calculate_db_hash()?;
-
     let remote_metadata = get_remote_metadata(&storage_url, &token).await?;
 
     if local_hash == remote_metadata.hash {
@@ -39,9 +74,50 @@ pub async fn check_sync_status() -> Result<bool> {
         Ok(true)
     } else {
         println!("Your database is out of sync with remote.");
-        println!("Local hash: {}", local_hash);
-        println!("Remote hash: {}", remote_metadata.hash);
         println!("Last sync: {}", remote_metadata.last_sync);
+
+        if verbose {
+            let local_db = Database::new()?;
+            let local_albums = local_db.get_all_albums()?;
+            let local_map: HashMap<i64, Album> = local_albums
+                .into_iter()
+                .map(|a| (a.id.unwrap(), a))
+                .collect();
+
+            let remote_albums = get_remote_database(&storage_url, &token).await?;
+            let remote_map: HashMap<i64, Album> = remote_albums
+                .into_iter()
+                .map(|a| (a.id.unwrap(), a))
+                .collect();
+
+            let mut added = 0;
+            let mut deleted = 0;
+            let mut updated = 0;
+
+            for (id, local_album) in &local_map {
+                match remote_map.get(id) {
+                    Some(remote_album) if remote_album != local_album => {
+                        updated += 1;
+                    }
+                    None => {
+                        deleted += 1;
+                    }
+                    _ => {}
+                }
+            }
+
+            for id in remote_map.keys() {
+                if !local_map.contains_key(id) {
+                    added += 1;
+                }
+            }
+
+            println!("\nChanges:");
+            println!("  Added:   {} album(s)", added);
+            println!("  Deleted: {} album(s)", deleted);
+            println!("  Updated: {} album(s)", updated);
+        }
+
         Ok(false)
     }
 }
