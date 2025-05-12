@@ -9,6 +9,7 @@ use cli::{parse_args, Command, SyncCommand, SyncConfigCommand};
 use comfy_table::{presets::UTF8_BORDERS_ONLY, Cell, CellAlignment, ContentArrangement, Table};
 use config::{load_config, save_config};
 use db::{Album, Database};
+use dialoguer::Input;
 use metadata::fetch_album_metadata;
 
 fn main() {
@@ -100,7 +101,7 @@ async fn run() -> Result<()> {
                     album: metadata.album,
                     genre: metadata.genre,
                     release_date: metadata.release_date,
-                    format,
+                    format: format.clone(),
                     source_url: metadata.source_url,
                     country: metadata.country,
                     artwork_url: metadata.artwork_url,
@@ -109,6 +110,65 @@ async fn run() -> Result<()> {
                 db.add_album(&album)?;
                 println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
             }
+
+            let config = load_config()?;
+            if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {
+                match sync::auto_sync().await {
+                    Ok(_) => println!("Auto sync completed successfully"),
+                    Err(e) => eprintln!("Auto sync failed: {}", e),
+                }
+            }
+        }
+        Command::ManualAdd { format } => {
+            let artist: String = Input::<String>::new()
+                .with_prompt("Enter artist name")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let album: String = Input::<String>::new()
+                .with_prompt("Enter album title")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let genre: String = Input::<String>::new()
+                .with_prompt("Enter genre")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let release_date: String = Input::<String>::new()
+                .with_prompt("Enter release date (YYYY-MM-DD)")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let country: String = Input::<String>::new()
+                .with_prompt("Enter country")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let source_url: String = Input::<String>::new()
+                .with_prompt("Enter source URL")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let artwork_url: String = Input::<String>::new()
+                .with_prompt("Enter artwork URL")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let album = Album {
+                id: None,
+                artist,
+                album,
+                genre,
+                release_date,
+                format,
+                source_url,
+                country,
+                artwork_url,
+            };
+
+            db.add_album(&album)?;
+            println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
 
             let config = load_config()?;
             if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {

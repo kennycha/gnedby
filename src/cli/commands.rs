@@ -20,6 +20,12 @@ pub enum Command {
         #[arg(long, default_value = "cd", value_parser = parse_format)]
         format: Format,
     },
+    /// Add album manually with interactive prompts
+    ManualAdd {
+        /// Album format (cd, lp, usb, tape)
+        #[arg(long, default_value = "cd", value_parser = parse_format)]
+        format: Format,
+    },
     /// Delete an album from your collection by ID
     Delete {
         /// Album ID to delete

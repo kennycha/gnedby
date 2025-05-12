@@ -11,6 +11,7 @@ gnedby is a command-line tool for managing your CD/LP collection. It allows you 
 
 - Must Have
   * User can add a music album by providing an Apple Music album ID
+  * User can add a music album manually with interactive prompts
   * Album metadata (artist, album title, genre, release date, country, artwork) is fetched automatically
   * Support for optional `--format lp` flag (default is CD)
   * List (`show`) and summary report (`report`) commands with filters: year, artist, genre, format, country
@@ -63,6 +64,7 @@ CLI -> EncryptedStorage : Store/retrieve tokens
 [source,bash]
 ----
 gnedby add <album_id> [--format lp]
+gnedby manual-add [--format lp]
 gnedby delete <id>
 gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>] [--country <country>] [--order-by id|album|artist|year]
 gnedby report [--year] [--artist] [--genre] [--format] [--country]

@@ -5,6 +5,7 @@ A CLI tool for managing your CD/LP/USB/Tape collection. Easily add album informa
 ## Features
 
 - Add music albums using Apple Music album IDs
+- Add albums manually with interactive prompts
 - Automatic album metadata fetching (artist, album title, genre, release date, country, artwork)
 - CD/LP/USB/Tape format support (`--format` flag)
 - List view and summary reports with various filters
@@ -25,7 +26,11 @@ cargo install gnedby
 ### Adding Albums
 
 ```bash
+# Add albums using Apple Music IDs
 gnedby add <album_id>... [--format lp]
+
+# Add album manually with interactive prompts
+gnedby manual-add [--format lp]
 ```
 
 ### Deleting Albums
