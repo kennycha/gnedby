@@ -101,7 +101,7 @@ async fn run() -> Result<()> {
                     album: metadata.album,
                     genre: metadata.genre,
                     release_date: metadata.release_date,
-                    format: format.clone(),
+                    format,
                     source_url: metadata.source_url,
                     country: metadata.country,
                     artwork_url: metadata.artwork_url,
