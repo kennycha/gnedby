@@ -13,7 +13,7 @@ gnedby is a command-line tool for managing your CD/LP collection. It allows you 
   * User can add a music album by providing an Apple Music album ID
   * User can add a music album manually with interactive prompts
   * Album metadata (artist, album title, genre, release date, country, artwork) is fetched automatically
-  * Support for optional `--format lp` flag (default is CD)
+  * Support for various formats `[--format <cd|lp|usb|tape>]` (default is cd)
   * List (`show`) and summary report (`report`) commands with filters: year, artist, genre, format, country
   * Local persistent storage using SQLite
   * Sync command structure with check/push/pull support
@@ -40,7 +40,7 @@ The CLI is implemented in Rust, using `clap` for command parsing, `rusqlite` for
 ----
 @startuml
 actor User
-User -> CLI : add <url> [--format lp]
+User -> CLI : add <url> [--format <cd|lp|usb|tape>]
 CLI -> MetadataFetcher : fetch_metadata(id)
 MetadataFetcher -> AppleMusic : GET album info
 AppleMusic --> MetadataFetcher : JSON response
@@ -63,10 +63,10 @@ CLI -> EncryptedStorage : Store/retrieve tokens
 
 [source,bash]
 ----
-gnedby add <album_id> [--format lp]
-gnedby manual-add [--format lp]
+gnedby add <album_id> [--format <cd|lp|usb|tape>]
+gnedby manual-add [--format <cd|lp|usb|tape>]
 gnedby delete <id>
-gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <CD|LP>] [--country <country>] [--order-by id|album|artist|year]
+gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <cd|lp|usb|tape>] [--country <country>] [--order-by id|album|artist|year]
 gnedby report [--year] [--artist] [--genre] [--format] [--country]
 gnedby sync check [-v]
 gnedby sync pull
