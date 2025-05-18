@@ -73,7 +73,7 @@ pub async fn serve() -> Result<()> {
         .route("/", get(index))
         .route("/api/albums", get(get_albums))
         .route("/api/albums/{id}", get(get_album_by_id))
-        .nest_service("/static", ServeDir::new("src/web/static"))
+        .nest_service("/static", ServeDir::new("static"))
         .with_state(db);
 
     let url = "http://localhost:8080";
