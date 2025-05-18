@@ -69,6 +69,14 @@ gnedby sync config set auto_sync true|false
 gnedby sync config reset
 ```
 
+### Running the Web Server
+
+```bash
+gnedby serve
+```
+
+- When you run the server, your browser will automatically open at `http://localhost:8080` where you can use the web interface.
+
 ## Sync Setup
 
 Use Supabase Storage for safe synchronization across multiple devices.
@@ -113,6 +121,8 @@ With automatic synchronization enabled, any newly added or deleted albums will b
 - reqwest (HTTP requests)
 - base64 and SHA-256 (token encryption)
 - Supabase Storage (synchronization)
+- axum (web server)
+- askama (SSR templates)
 
 ## License
 

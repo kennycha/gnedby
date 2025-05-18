@@ -18,6 +18,9 @@ gnedby is a command-line tool for managing your CD/LP collection. It allows you 
   * Local persistent storage using SQLite
   * Sync command structure with check/push/pull support
   * Secure token storage using system keychain
+  * User can run a web server with `gnedby serve`
+  * User can view their album collection in a responsive web interface (SSR)
+  * User can access album data via REST API endpoints (`/api/albums`, `/api/albums/{id}`)
 
 - Should Have
   * Extensible CLI architecture (e.g. to support Bandcamp in future)
@@ -56,6 +59,15 @@ RemoteStore --> CLI : metadata JSON
 CLI -> RemoteStore : Upload/Download albums.db
 User -> CLI : sync config show | set | reset
 CLI -> EncryptedStorage : Store/retrieve tokens
+User -> CLI : serve
+CLI -> WebServer : start
+WebServer -> Database : SELECT * FROM albums
+User -> WebServer : GET /
+WebServer -> TemplateEngine : render albums.html with data
+TemplateEngine -> User : HTML page
+User -> WebServer : GET /api/albums
+WebServer -> Database : SELECT * FROM albums
+WebServer -> User : JSON response
 @enduml
 ----
 
@@ -74,6 +86,7 @@ gnedby sync push
 gnedby sync config show
 gnedby sync config set <key> <value>
 gnedby sync config reset
+gnedby serve
 ----
 
 === Database Schema
@@ -92,6 +105,26 @@ CREATE TABLE albums (
     artwork_url TEXT
 );
 ----
+
+=== Web Server Implementation
+
+- Uses axum for HTTP server
+- Uses askama for SSR HTML rendering
+- Serves static files (CSS, JS) for the web UI
+- Provides REST API endpoints for album data
+
+==== Endpoints
+
+- `/` : SSR HTML album list (responsive)
+- `/api/albums` : All albums (JSON)
+- `/api/albums/{id}` : Single album (JSON)
+- `/static/*` : Static assets (CSS, JS, images)
+
+==== Features
+
+- Thread-safe, async DB access for concurrent requests
+- Responsive design for desktop and mobile
+- Automatic browser launch on server start
 
 === Metadata Extraction
 
@@ -225,6 +258,9 @@ gnedby sync push
 11. Auto-sync capability for add/delete operations
 12. Error handling and user-friendly messages
 13. Documentation and README
+14. Web server and SSR implementation with axum + askama
+15. REST API endpoints for album data
+16. Responsive web UI with static assets
 
 == Milestones
 
@@ -237,6 +273,7 @@ gnedby sync push
 7. Secure Token Storage ✓
 8. Sync Functionality (check, pull, push) ✓
 9. Documentation ✓
+10. Web server and SSR implementation ✓
 
 == Gathering Results
 
