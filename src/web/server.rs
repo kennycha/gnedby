@@ -3,12 +3,11 @@ use anyhow::Result;
 use askama::Template;
 use axum::{
     extract::{Path, State},
-    response::Html,
+    response::{Html, IntoResponse, Response},
     routing::get,
     Json, Router,
 };
 use std::sync::Arc;
-use tower_http::services::ServeDir;
 
 struct AlbumView<'a> {
     artwork_url: &'a str,
@@ -65,6 +64,11 @@ async fn index(State(db): State<Arc<Database>>) -> Html<String> {
     Html(tmpl.render().unwrap())
 }
 
+async fn style_css() -> Response {
+    const STYLE: &str = include_str!("static/style.css");
+    ([("Content-Type", "text/css; charset=utf-8")], STYLE).into_response()
+}
+
 pub async fn serve() -> Result<()> {
     let db = Database::new().await?;
     let db = Arc::new(db);
@@ -73,7 +77,7 @@ pub async fn serve() -> Result<()> {
         .route("/", get(index))
         .route("/api/albums", get(get_albums))
         .route("/api/albums/{id}", get(get_album_by_id))
-        .nest_service("/static", ServeDir::new("static"))
+        .route("/static/style.css", get(style_css))
         .with_state(db);
 
     let url = "http://localhost:8080";
