@@ -45,8 +45,8 @@ async fn get_remote_database(storage_url: &str, token: &str) -> Result<Vec<Album
     let backup_path = db_path.with_extension("db.temp");
     fs::write(&backup_path, &db_content).context("Failed to write temporary database file")?;
 
-    let remote_db = Database::with_path(&backup_path)?;
-    let remote_albums = remote_db.get_all_albums()?;
+    let remote_db = Database::with_path(&backup_path).await?;
+    let remote_albums = remote_db.get_all_albums().await?;
 
     fs::remove_file(&backup_path).ok();
     Ok(remote_albums)
@@ -77,8 +77,8 @@ pub async fn check_sync_status(verbose: bool) -> Result<bool> {
         println!("Last sync: {}", remote_metadata.last_sync);
 
         if verbose {
-            let local_db = Database::new()?;
-            let local_albums = local_db.get_all_albums()?;
+            let local_db = Database::new().await?;
+            let local_albums = local_db.get_all_albums().await?;
             let local_map: HashMap<i64, Album> = local_albums
                 .into_iter()
                 .map(|a| (a.id.unwrap(), a))

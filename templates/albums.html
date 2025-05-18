@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GNEDBY</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>In My GNEDBY</h1>
+      <table class="albums-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Album</th>
+            <th>Artist</th>
+            <th>Format</th>
+            <th>Release Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for album in albums %}
+          <tr>
+            <td data-label="Artwork">
+              <img
+                class="album-artwork"
+                src="{{ album.artwork_url }}"
+                alt="{{
+              album.album }} by {{ album.artist }}"
+              />
+            </td>
+            <td data-label="Album" class="album-title">{{ album.album }}</td>
+            <td data-label="Artist" class="album-artist">{{ album.artist }}</td>
+            <td data-label="Format" class="album-details">
+              {{ album.format_upper }}
+            </td>
+            <td data-label="Release Date" class="album-details">
+              {{ album.release_date_short }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

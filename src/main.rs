@@ -3,6 +3,7 @@ mod config;
 mod db;
 mod metadata;
 mod sync;
+mod web;
 
 use anyhow::Result;
 use cli::{parse_args, Command, SyncCommand, SyncConfigCommand};
@@ -88,7 +89,7 @@ fn create_artist_table(stats: Vec<(String, i64)>) -> Result<()> {
 #[tokio::main]
 async fn run() -> Result<()> {
     let cli = parse_args()?;
-    let db = Database::new()?;
+    let db = Database::new().await?;
 
     match cli.command {
         Command::Add { album_ids, format } => {
@@ -107,7 +108,7 @@ async fn run() -> Result<()> {
                     artwork_url: metadata.artwork_url,
                 };
 
-                db.add_album(&album)?;
+                db.add_album(&album).await?;
                 println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
             }
 
@@ -167,7 +168,7 @@ async fn run() -> Result<()> {
                 artwork_url,
             };
 
-            db.add_album(&album)?;
+            db.add_album(&album).await?;
             println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
 
             let config = load_config()?;
@@ -178,7 +179,7 @@ async fn run() -> Result<()> {
                 }
             }
         }
-        Command::Delete { id } => match db.delete_album(id) {
+        Command::Delete { id } => match db.delete_album(id).await {
             Ok(_) => {
                 println!("Album with ID {} deleted successfully", id);
 
@@ -222,14 +223,16 @@ async fn run() -> Result<()> {
             let country_ref = country.as_deref();
             let order_by_ref = order_by.as_deref();
 
-            let albums = db.list_albums(
-                year,
-                artist_ref,
-                genre_ref,
-                format_ref,
-                country_ref,
-                order_by_ref,
-            )?;
+            let albums = db
+                .list_albums(
+                    year,
+                    artist_ref,
+                    genre_ref,
+                    format_ref,
+                    country_ref,
+                    order_by_ref,
+                )
+                .await?;
 
             if albums.is_empty() {
                 println!("No albums found in my GNEDBY {}", filter_msg);
@@ -276,19 +279,19 @@ async fn run() -> Result<()> {
             country,
         } => {
             if artist {
-                let artist_stats = db.get_artist_stats()?;
+                let artist_stats = db.get_artist_stats().await?;
                 create_artist_table(artist_stats)?;
             } else if genre {
-                let genre_stats = db.get_genre_stats()?;
+                let genre_stats = db.get_genre_stats().await?;
                 create_bar_chart_table(genre_stats, "Albums by Genre", "Genre")?;
             } else if format {
-                let format_stats = db.get_format_stats()?;
+                let format_stats = db.get_format_stats().await?;
                 create_bar_chart_table(format_stats, "Albums by Format", "Format")?;
             } else if country {
-                let country_stats = db.get_country_stats()?;
+                let country_stats = db.get_country_stats().await?;
                 create_bar_chart_table(country_stats, "Albums by Country", "Country")?;
             } else {
-                let year_stats = db.get_year_stats()?;
+                let year_stats = db.get_year_stats().await?;
                 create_bar_chart_table(year_stats, "Albums by Year", "Year")?;
             }
         }
@@ -355,6 +358,9 @@ async fn run() -> Result<()> {
                 }
             },
         },
+        Command::Serve => {
+            web::serve().await?;
+        }
     }
 
     Ok(())

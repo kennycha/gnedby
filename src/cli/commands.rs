@@ -96,6 +96,8 @@ pub enum Command {
         #[command(subcommand)]
         command: SyncCommand,
     },
+    /// Start web server to view albums
+    Serve,
 }
 
 #[derive(Parser, Debug)]

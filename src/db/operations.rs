@@ -1,28 +1,32 @@
 use crate::db::models::Album;
 use anyhow::{Context, Result};
 use directories::ProjectDirs;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
+use tokio::sync::Mutex;
 
 pub struct Database {
-    conn: Connection,
+    conn: Mutex<Connection>,
 }
 
 impl Database {
-    pub fn new() -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         let db_path = get_db_path()?;
         let conn = Connection::open(&db_path)?;
-        let db = Database { conn };
-        db.init()?;
+        let db = Database {
+            conn: Mutex::new(conn),
+        };
+        db.init().await?;
         Ok(db)
     }
 
-    fn init(&self) -> Result<()> {
-        self.conn.execute(
+    pub async fn init(&self) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS albums (
                 id INTEGER PRIMARY KEY,
                 artist TEXT NOT NULL,
@@ -39,8 +43,9 @@ impl Database {
         Ok(())
     }
 
-    pub fn add_album(&self, album: &Album) -> Result<i64> {
-        self.conn.execute(
+    pub async fn add_album(&self, album: &Album) -> Result<i64> {
+        let conn = self.conn.lock().await;
+        conn.execute(
             "INSERT INTO albums (artist, album, genre, release_date, format, source_url, country, artwork_url)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             (
@@ -54,12 +59,12 @@ impl Database {
                 &album.artwork_url,
             ),
         )?;
-        let id = self.conn.last_insert_rowid();
+        let id = conn.last_insert_rowid();
 
         Ok(id)
     }
 
-    pub fn list_albums(
+    pub async fn list_albums(
         &self,
         year: Option<i32>,
         artist: Option<&str>,
@@ -68,6 +73,7 @@ impl Database {
         country: Option<&str>,
         order_by: Option<&str>,
     ) -> Result<Vec<Album>> {
+        let conn = self.conn.lock().await;
         let base_query = "
             SELECT id, artist, album, genre, release_date, format, source_url, country, artwork_url 
             FROM albums 
@@ -111,7 +117,7 @@ impl Database {
             _ => sql.push_str(" ORDER BY id"),
         }
 
-        let mut stmt = self.conn.prepare(&sql)?;
+        let mut stmt = conn.prepare(&sql)?;
         let params_iter = params_values.iter().map(|p| p.as_ref());
 
         let album_rows = stmt.query_map(rusqlite::params_from_iter(params_iter), |row| {
@@ -136,7 +142,8 @@ impl Database {
         Ok(albums)
     }
 
-    pub fn get_artist_stats(&self) -> Result<Vec<(String, i64)>> {
+    pub async fn get_artist_stats(&self) -> Result<Vec<(String, i64)>> {
+        let conn = self.conn.lock().await;
         let sql = "
             SELECT artist, COUNT(*) as count 
             FROM albums 
@@ -144,7 +151,7 @@ impl Database {
             ORDER BY count DESC
         ";
 
-        let mut stmt = self.conn.prepare(sql)?;
+        let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map([], |row| {
             let artist: String = row.get(0)?;
             let count: i64 = row.get(1)?;
@@ -159,7 +166,8 @@ impl Database {
         Ok(stats)
     }
 
-    pub fn get_year_stats(&self) -> Result<Vec<(String, i64)>> {
+    pub async fn get_year_stats(&self) -> Result<Vec<(String, i64)>> {
+        let conn = self.conn.lock().await;
         let sql = "
             SELECT strftime('%Y', release_date) as year, COUNT(*) as count 
             FROM albums 
@@ -167,7 +175,7 @@ impl Database {
             ORDER BY year ASC
         ";
 
-        let mut stmt = self.conn.prepare(sql)?;
+        let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map([], |row| {
             let year: String = row.get(0)?;
             let count: i64 = row.get(1)?;
@@ -182,7 +190,8 @@ impl Database {
         Ok(stats)
     }
 
-    pub fn get_genre_stats(&self) -> Result<Vec<(String, i64)>> {
+    pub async fn get_genre_stats(&self) -> Result<Vec<(String, i64)>> {
+        let conn = self.conn.lock().await;
         let sql = "
             SELECT genre, COUNT(*) as count 
             FROM albums 
@@ -190,7 +199,7 @@ impl Database {
             ORDER BY count DESC
         ";
 
-        let mut stmt = self.conn.prepare(sql)?;
+        let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map([], |row| {
             let genre: String = row.get(0)?;
             let count: i64 = row.get(1)?;
@@ -205,7 +214,8 @@ impl Database {
         Ok(stats)
     }
 
-    pub fn get_format_stats(&self) -> Result<Vec<(String, i64)>> {
+    pub async fn get_format_stats(&self) -> Result<Vec<(String, i64)>> {
+        let conn = self.conn.lock().await;
         let sql = "
             SELECT format, COUNT(*) as count 
             FROM albums 
@@ -213,7 +223,7 @@ impl Database {
             ORDER BY count DESC
         ";
 
-        let mut stmt = self.conn.prepare(sql)?;
+        let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map([], |row| {
             let format: String = row.get(0)?;
             let count: i64 = row.get(1)?;
@@ -228,7 +238,8 @@ impl Database {
         Ok(stats)
     }
 
-    pub fn get_country_stats(&self) -> Result<Vec<(String, i64)>> {
+    pub async fn get_country_stats(&self) -> Result<Vec<(String, i64)>> {
+        let conn = self.conn.lock().await;
         let sql = "
             SELECT country, COUNT(*) as count 
             FROM albums 
@@ -236,7 +247,7 @@ impl Database {
             ORDER BY count DESC
         ";
 
-        let mut stmt = self.conn.prepare(sql)?;
+        let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map([], |row| {
             let country: String = row.get(0)?;
             let count: i64 = row.get(1)?;
@@ -251,8 +262,9 @@ impl Database {
         Ok(stats)
     }
 
-    pub fn delete_album(&self, id: i64) -> Result<()> {
-        let rows_affected = self.conn.execute("DELETE FROM albums WHERE id = ?", [id])?;
+    pub async fn delete_album(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().await;
+        let rows_affected = conn.execute("DELETE FROM albums WHERE id = ?", [id])?;
 
         if rows_affected == 0 {
             return Err(anyhow::anyhow!("Album with ID {} not found", id));
@@ -261,8 +273,36 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_all_albums(&self) -> Result<Vec<Album>> {
-        let mut stmt = self.conn.prepare(
+    pub async fn get_album_by_id(&self, id: i64) -> Result<Option<Album>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn.prepare(
+            "SELECT id, artist, album, genre, release_date, format, source_url, country, artwork_url 
+             FROM albums 
+             WHERE id = ?"
+        )?;
+
+        let album = stmt
+            .query_row([id], |row| {
+                Ok(Album {
+                    id: Some(row.get(0)?),
+                    artist: row.get(1)?,
+                    album: row.get(2)?,
+                    genre: row.get(3)?,
+                    release_date: row.get(4)?,
+                    format: row.get(5)?,
+                    source_url: row.get(6)?,
+                    country: row.get(7)?,
+                    artwork_url: row.get(8)?,
+                })
+            })
+            .optional()?;
+
+        Ok(album)
+    }
+
+    pub async fn get_all_albums(&self) -> Result<Vec<Album>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn.prepare(
             "SELECT id, artist, album, genre, release_date, format, source_url, country, artwork_url FROM albums",
         )?;
 
@@ -287,10 +327,12 @@ impl Database {
         Ok(result)
     }
 
-    pub fn with_path(path: &Path) -> Result<Self> {
+    pub async fn with_path(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
-        let db = Database { conn };
-        db.init()?;
+        let db = Database {
+            conn: Mutex::new(conn),
+        };
+        db.init().await?;
         Ok(db)
     }
 }
