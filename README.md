@@ -77,6 +77,17 @@ gnedby serve
 
 - When you run the server, your browser will automatically open at `http://localhost:8080` where you can use the web interface.
 
+### Embedding Artworks
+
+```bash
+gnedby embed
+```
+
+- Note: The first time you run `gnedby embed`, the required embedding model will be automatically downloaded to your local cache directory. This only happens once and allows the tool to work fully offline afterward.
+- Downloads artwork image for each album
+- Generates a 1000-dimension embedding vector using MobileNet
+- Uploads to Supabase Vector DB for future image similarity search
+
 ## Sync Setup
 
 Use Supabase Storage for safe synchronization across multiple devices.

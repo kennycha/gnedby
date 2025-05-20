@@ -288,3 +288,117 @@ Evaluation of the `gnedby` tool will focus on the following criteria:
 - Extendability: Can new sources or formats be integrated easily?
 
 User testing over a 2–4 week period will guide refinements.
+
+= SPEC-2: gnedby embed
+
+== Requirements
+
+- Should Have
+  * User can generate embeddings for each album artwork via `gnedby embed`
+  * Embeddings are uploaded to a Supabase Vector DB (PostgreSQL + pgvector)
+  * Each album's metadata and vector embedding is stored in a searchable format
+
+== Method
+
+To enable image-based album recognition and support similarity search, gnedby is extended with image embedding capabilities.
+
+=== Embedding Command
+
+A new command is introduced:
+
+```bash
+gnedby embed [--force]
+```
+
+- Fetches `artwork_url` from local SQLite
+- Downloads image (with cache)
+- Computes image embedding using MobileNetV2
+- Uploads metadata and vector to Supabase PostgreSQL with pgvector
+
+=== Vector DB Schema
+
+```sql
+CREATE TABLE albums (
+  id uuid PRIMARY KEY,
+  title text,
+  artist text,
+  artwork_url text,
+  embedding vector(1000)
+);
+CREATE INDEX ON albums USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+```
+
+=== Architecture Diagram
+
+[plantuml, embed-pipeline, svg]
+----
+@startuml
+actor User
+component "gnedby CLI" as CLI
+component "Image Downloader" as DL
+component "Embedding Module
+(MobileNetV2)" as EMB
+database "SQLite" as LOCALDB
+database "Supabase Vector DB" as REMOTEDB
+
+User -> CLI: gnedby embed
+CLI -> LOCALDB: read album list
+CLI -> DL: download artwork_url
+DL -> EMB: send image file
+EMB -> CLI: embedding vector
+CLI -> REMOTEDB: upload metadata + vector
+@enduml
+----
+
+== Implementation
+
+. Add `embed` subcommand to CLI
+. Use `reqwest` to fetch artwork images
+. Interface with Python subprocess or native Rust inference for MobileNetV2 embedding
+. Serialize vector and metadata to JSON and upload via Supabase REST API
+
+== Milestones
+
+- Phase 1: Add `embed` command with local image processing
+- Phase 2: Store embeddings to Supabase DB
+- Phase 3: Validate embeddings against real user images (for next app)
+
+
+
+=== Embedding Model Execution
+
+The embedding model used is MobileNetV2, executed entirely within Rust for portability. The model is pre-converted to ONNX format and loaded via the `ort` crate (ONNX Runtime for Rust). This avoids any need for Python or external subprocesses.
+
+Image preprocessing includes:
+- Resizing to 224x224 pixels
+- Normalization using ImageNet mean and standard deviation values
+- Conversion to tensor format suitable for ONNX model input
+
+
+== Implementation
+
+. Add `embed` subcommand to the CLI
+. Load the ONNX model at runtime using `ort` crate
+. Fetch artwork image using `reqwest`
+. Preprocess image using `image` and `ndarray` crates to format as input tensor
+. Run inference via ONNX Runtime to get 512-d vector
+. Structure payload with metadata and vector
+. Upload to Supabase REST API via `reqwest`
+. Handle upload failure and retries
+
+== Milestones
+
+- Phase 1: ONNX model integration with image preprocessing and local embedding
+- Phase 2: Verified upload to Supabase with REST API and schema index
+- Phase 3: Test embedding consistency across systems
+
+=== Model Distribution Strategy
+
+The embedding model (MobileNetV2) is not embedded in the binary due to size constraints. Instead, GNEDBY will automatically download the model on first use.
+
+- On first run of `gnedby embed`, the CLI checks for the presence of the ONNX model in a local cache directory (e.g., `$HOME/.cache/gnedby` or platform-specific location).
+- If not found, the model is downloaded from the ONNX Model Zoo GitHub repository.
+- After download, the model is reused locally for all subsequent embedding operations.
+- This allows the CLI to remain lightweight and installation via `cargo install gnedby` to be seamless.
+
+This strategy ensures full offline functionality after the initial run.

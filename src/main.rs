@@ -1,6 +1,7 @@
 mod cli;
 mod config;
 mod db;
+mod embed;
 mod metadata;
 mod sync;
 mod web;
@@ -11,6 +12,8 @@ use comfy_table::{presets::UTF8_BORDERS_ONLY, Cell, CellAlignment, ContentArrang
 use config::{load_config, save_config};
 use db::{Album, Database};
 use dialoguer::Input;
+use embed::model::EmbeddingModel;
+use embed::Embedder;
 use metadata::fetch_album_metadata;
 
 fn main() {
@@ -360,6 +363,12 @@ async fn run() -> Result<()> {
         },
         Command::Serve => {
             web::serve().await?;
+        }
+        Command::Embed { force } => {
+            println!("Starting embedding generation...");
+            let embedder = Embedder::new().await?;
+            embedder.process_albums(&db, force).await?;
+            println!("Embedding generation completed successfully");
         }
     }
 

@@ -31,6 +31,12 @@ pub enum Command {
         /// Album ID to delete
         id: i64,
     },
+    /// Generate embeddings for album artworks
+    Embed {
+        /// Force regenerate embeddings for all albums
+        #[arg(long, default_value_t = false)]
+        force: bool,
+    },
     /// List albums in your collection with optional filters (use only one filter at a time)
     #[command(group(
         ArgGroup::new("filter")
