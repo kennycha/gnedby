@@ -1,11 +1,17 @@
 use crate::db::Database;
+use crate::embed::models::AlbumVector;
 use anyhow::Result;
 
+pub mod downloader;
 pub mod model;
-mod processor;
+pub mod models;
+pub mod processor;
 
 use model::EmbeddingModel;
 use processor::ImageProcessor;
+
+use crate::api::fetch_embedded_album_ids;
+use crate::config::load_embed_config;
 
 pub struct Embedder {
     image_processor: ImageProcessor,
@@ -20,48 +26,47 @@ impl Embedder {
         })
     }
 
-    pub async fn process_albums(&self, db: &Database, _force: bool) -> Result<()> {
+    pub async fn process_albums(&self, db: &Database, force: bool) -> Result<Vec<AlbumVector>> {
         let albums = db.get_all_albums().await?;
-
         println!("Found {} albums in local database", albums.len());
         println!("Processing first 5 albums for testing...");
 
-        // 앞에서 5개 앨범만 처리
-        for album in albums.iter().take(5) {
+        let mut vectors = Vec::new();
+        let albums_to_process = if force {
+            albums.iter().take(5).collect::<Vec<_>>()
+        } else {
+            let config = load_embed_config()?;
+            let api_url = config
+                .api_url
+                .ok_or_else(|| anyhow::anyhow!("api_url is not set."))?;
+            let token = config
+                .token
+                .ok_or_else(|| anyhow::anyhow!("token is not set."))?;
+            let embedded_ids = fetch_embedded_album_ids(&api_url, &token).await?;
+            albums
+                .iter()
+                .filter(|a| a.id.is_some() && !embedded_ids.contains(&a.id.unwrap()))
+                .take(5)
+                .collect::<Vec<_>>()
+        };
+
+        for album in albums_to_process {
             println!(
                 "\nProcessing artwork for {} by {}",
                 album.album, album.artist
             );
-
-            // Download artwork
             let image_data = self.download_artwork(&album.artwork_url).await?;
-
-            // Process image
             let processed_image = self.image_processor.process_image(&image_data)?;
-
-            // Generate embedding
             let embedding = self.embedding_model.generate_embedding(&processed_image)?;
-
-            // 임베딩 검증
-            let min = embedding.iter().fold(f32::INFINITY, |a, &b| a.min(b));
-            let max = embedding.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
-            let mean = embedding.iter().sum::<f32>() / embedding.len() as f32;
-            let norm = (embedding.iter().map(|x| x * x).sum::<f32>()).sqrt();
-
-            println!("Embedding stats:");
-            println!("  Size: {}", embedding.len());
-            println!("  Min: {:.4}", min);
-            println!("  Max: {:.4}", max);
-            println!("  Mean: {:.4}", mean);
-            println!("  Norm: {:.4}", norm);
-            println!("  First 5 values: {:?}", &embedding[..5]);
+            let album_vector = AlbumVector::from_album(album, embedding);
+            vectors.push(album_vector);
         }
-
-        Ok(())
+        Ok(vectors)
     }
 
     async fn download_artwork(&self, url: &str) -> Result<Vec<u8>> {
-        let response = reqwest::get(url).await?;
+        let client = reqwest::Client::new();
+        let response = client.get(url).send().await?;
         let bytes = response.bytes().await?;
         Ok(bytes.to_vec())
     }

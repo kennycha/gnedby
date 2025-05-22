@@ -1,4 +1,4 @@
-use crate::config::load_config;
+use crate::config::{load_sync_config, save_sync_config};
 use crate::db::calculate_db_hash;
 use crate::db::get_db_path;
 use crate::db::models::Album;
@@ -53,7 +53,7 @@ async fn get_remote_database(storage_url: &str, token: &str) -> Result<Vec<Album
 }
 
 pub async fn check_sync_status(verbose: bool) -> Result<bool> {
-    let config = load_config()?;
+    let config = load_sync_config()?;
 
     if config.storage_url.is_none() || config.token.is_none() {
         println!("Sync is not configured. Please set storage_url and token first:");
@@ -123,7 +123,7 @@ pub async fn check_sync_status(verbose: bool) -> Result<bool> {
 }
 
 pub async fn pull_from_remote() -> Result<()> {
-    let config = load_config()?;
+    let config = load_sync_config()?;
 
     if config.storage_url.is_none() || config.token.is_none() {
         println!("Sync is not configured. Please set storage_url and token first.");
@@ -167,15 +167,15 @@ pub async fn pull_from_remote() -> Result<()> {
         last_sync: Utc::now().to_rfc3339(),
     };
 
-    let mut config = load_config()?;
+    let mut config = load_sync_config()?;
     config.last_sync = Some(metadata.last_sync.clone());
-    crate::config::save_config(&config)?;
+    save_sync_config(&config)?;
 
     Ok(())
 }
 
 pub async fn push_to_remote() -> Result<()> {
-    let config = load_config()?;
+    let config = load_sync_config()?;
 
     if config.storage_url.is_none() || config.token.is_none() {
         println!("Sync is not configured. Please set storage_url and token first.");
@@ -230,9 +230,9 @@ pub async fn push_to_remote() -> Result<()> {
         ));
     }
 
-    let mut config = load_config()?;
+    let mut config = load_sync_config()?;
     config.last_sync = Some(now);
-    crate::config::save_config(&config)?;
+    save_sync_config(&config)?;
 
     println!("Database pushed successfully!");
     Ok(())
@@ -252,8 +252,8 @@ async fn get_remote_metadata(storage_url: &str, token: &str) -> Result<SyncMetad
         let metadata: SyncMetadata = response.json().await.context("Failed to parse metadata")?;
         Ok(metadata)
     } else if response.status().as_u16() == 404 || response.status().as_u16() == 400 {
-        println!("원격 저장소에 메타데이터가 없습니다. 아직 초기화 되지 않았습니다.");
-        println!("먼저 'gnedby sync push' 명령을 실행하여 초기화를 진행해주세요.");
+        println!("No metadata found in the remote storage. It has not been initialized yet.");
+        println!("Please run the 'gnedby sync push' command first to initialize.");
 
         Ok(SyncMetadata {
             hash: "empty".to_string(),
@@ -300,7 +300,7 @@ fn create_client(token: &str) -> Result<Client> {
 }
 
 pub async fn auto_sync() -> Result<()> {
-    let config = load_config()?;
+    let config = load_sync_config()?;
 
     if !config.auto_sync {
         println!("Auto sync is disabled in configuration");

@@ -33,9 +33,8 @@ pub enum Command {
     },
     /// Generate embeddings for album artworks
     Embed {
-        /// Force regenerate embeddings for all albums
-        #[arg(long, default_value_t = false)]
-        force: bool,
+        #[command(subcommand)]
+        command: EmbedCommand,
     },
     /// List albums in your collection with optional filters (use only one filter at a time)
     #[command(group(
@@ -137,6 +136,38 @@ pub enum SyncConfigCommand {
         value: String,
     },
     /// Reset sync configuration to default values
+    Reset,
+}
+
+#[derive(Parser, Debug)]
+pub enum EmbedCommand {
+    /// Run embedding generation
+    Run {
+        /// Force regenerate embeddings for all albums
+        #[arg(long, default_value_t = false)]
+        force: bool,
+    },
+    /// Download embedding model from Supabase
+    LoadModel,
+    /// Configure embedding settings
+    Config {
+        #[command(subcommand)]
+        command: EmbedConfigCommand,
+    },
+}
+
+#[derive(Parser, Debug)]
+pub enum EmbedConfigCommand {
+    /// Show current embedding configuration
+    Show,
+    /// Set embedding configuration value
+    Set {
+        /// Configuration key (e.g., api_url, token)
+        key: String,
+        /// Configuration value
+        value: String,
+    },
+    /// Reset embedding configuration to default values
     Reset,
 }
 

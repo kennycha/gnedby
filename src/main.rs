@@ -1,3 +1,4 @@
+mod api;
 mod cli;
 mod config;
 mod db;
@@ -7,12 +8,12 @@ mod sync;
 mod web;
 
 use anyhow::Result;
-use cli::{parse_args, Command, SyncCommand, SyncConfigCommand};
+use api::bulk_upload_album_vectors;
+use cli::{parse_args, Command, EmbedCommand, EmbedConfigCommand, SyncCommand, SyncConfigCommand};
 use comfy_table::{presets::UTF8_BORDERS_ONLY, Cell, CellAlignment, ContentArrangement, Table};
-use config::{load_config, save_config};
+use config::{load_embed_config, load_sync_config, save_embed_config, save_sync_config};
 use db::{Album, Database};
 use dialoguer::Input;
-use embed::model::EmbeddingModel;
 use embed::Embedder;
 use metadata::fetch_album_metadata;
 
@@ -115,7 +116,7 @@ async fn run() -> Result<()> {
                 println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
             }
 
-            let config = load_config()?;
+            let config = load_sync_config()?;
             if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {
                 match sync::auto_sync().await {
                     Ok(_) => println!("Auto sync completed successfully"),
@@ -174,7 +175,7 @@ async fn run() -> Result<()> {
             db.add_album(&album).await?;
             println!("Added album \"{}\" by \"{}\"", album.album, album.artist);
 
-            let config = load_config()?;
+            let config = load_sync_config()?;
             if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {
                 match sync::auto_sync().await {
                     Ok(_) => println!("Auto sync completed successfully"),
@@ -186,7 +187,7 @@ async fn run() -> Result<()> {
             Ok(_) => {
                 println!("Album with ID {} deleted successfully", id);
 
-                let config = load_config()?;
+                let config = load_sync_config()?;
                 if config.auto_sync && config.storage_url.is_some() && config.token.is_some() {
                     match sync::auto_sync().await {
                         Ok(_) => println!("Auto sync completed successfully"),
@@ -314,12 +315,12 @@ async fn run() -> Result<()> {
             }
             SyncCommand::Config { command } => match command {
                 SyncConfigCommand::Show => {
-                    let config = load_config()?;
+                    let config = load_sync_config()?;
                     println!("Current sync configuration:");
                     println!("{}", serde_json::to_string_pretty(&config)?);
                 }
                 SyncConfigCommand::Set { key, value } => {
-                    let mut config = load_config()?;
+                    let mut config = load_sync_config()?;
 
                     match key.as_str() {
                         "storage_url" => {
@@ -350,11 +351,11 @@ async fn run() -> Result<()> {
                         }
                     }
 
-                    save_config(&config)?;
+                    save_sync_config(&config)?;
                 }
                 SyncConfigCommand::Reset => {
                     let default_config = config::SyncConfig::default();
-                    save_config(&default_config)?;
+                    save_sync_config(&default_config)?;
 
                     println!("Sync configuration has been reset to default values.");
                     println!("Token has been removed from secure storage.");
@@ -364,12 +365,57 @@ async fn run() -> Result<()> {
         Command::Serve => {
             web::serve().await?;
         }
-        Command::Embed { force } => {
-            println!("Starting embedding generation...");
-            let embedder = Embedder::new().await?;
-            embedder.process_albums(&db, force).await?;
-            println!("Embedding generation completed successfully");
-        }
+        Command::Embed { command } => match command {
+            EmbedCommand::Run { force } => {
+                println!("Starting embedding generation...");
+                let embedder = Embedder::new().await?;
+                let vectors = embedder.process_albums(&db, force).await?;
+                println!("Embedding generation completed. Uploading to Supabase...");
+                let config = load_embed_config()?;
+                let api_url = config
+                    .api_url
+                    .ok_or_else(|| anyhow::anyhow!("api_url is not set."))?;
+                let token = config
+                    .token
+                    .ok_or_else(|| anyhow::anyhow!("token is not set."))?;
+                bulk_upload_album_vectors(&api_url, &token, &vectors).await?;
+                println!("Embedding generation & upload completed successfully");
+            }
+            EmbedCommand::LoadModel => {
+                let path = embed::downloader::download_model().await?;
+                println!("Model downloaded successfully to: {}", path.display());
+            }
+            EmbedCommand::Config { command } => match command {
+                EmbedConfigCommand::Show => {
+                    let config = load_embed_config()?;
+                    println!("Current embedding configuration:");
+                    println!("{}", serde_json::to_string_pretty(&config)?);
+                }
+                EmbedConfigCommand::Set { key, value } => {
+                    let mut config = load_embed_config()?;
+                    match key.as_str() {
+                        "api_url" => {
+                            config.api_url = Some(value.clone());
+                            println!("Set api_url to: {}", value);
+                        }
+                        "token" => {
+                            config.token = Some(value.clone());
+                            println!("Set token to: {}", value);
+                        }
+                        _ => {
+                            println!("Unknown embedding configuration key: {}", key);
+                        }
+                    }
+                    save_embed_config(&config)?;
+                }
+                EmbedConfigCommand::Reset => {
+                    let default_config = config::EmbedConfig::default();
+                    save_embed_config(&default_config)?;
+
+                    println!("Embedding configuration has been reset to default values.");
+                }
+            },
+        },
     }
 
     Ok(())
