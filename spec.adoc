@@ -87,6 +87,12 @@ gnedby sync config show
 gnedby sync config set <key> <value>
 gnedby sync config reset
 gnedby serve
+gnedby embed run [--force]
+gnedby embed config show
+gnedby embed config set api_url <supabase_vector_api_url>
+gnedby embed config set token <supabase_token>
+gnedby embed config reset
+gnedby embed load-model
 ----
 
 === Database Schema
@@ -304,16 +310,22 @@ To enable image-based album recognition and support similarity search, gnedby is
 
 === Embedding Command
 
-A new command is introduced:
+A set of embedding-related commands are provided:
 
-```bash
-gnedby embed [--force]
-```
+* `gnedby embed run [--force]` — Generate and upload embeddings for album artworks. If `--force` is given, all albums are processed; otherwise, only albums without embeddings are processed.
+* `gnedby embed config ...` — Manage embedding configuration (API URL, token, reset, show).
+* `gnedby embed load-model` — Download the MobileNetV2 embedding model from Supabase public storage to the local config directory (`~/.config/gnedby/model.onnx`). If the model file already exists, download is skipped. This must be run before embedding if the model is not present.
 
-- Fetches `artwork_url` from local SQLite
-- Downloads image (with cache)
-- Computes image embedding using MobileNetV2
-- Uploads metadata and vector to Supabase PostgreSQL with pgvector
+==== Model Download and Management
+
+- The embedding model (ONNX format) is not bundled with the binary. It must be downloaded using `gnedby embed load-model`.
+- The model is saved to `~/.config/gnedby/model.onnx`.
+- If the model file is missing, embedding will fail with an error message instructing the user to run `gnedby embed load-model` first.
+
+==== Embedding Configuration
+
+- Embedding configuration (API URL, token) is managed via `gnedby embed config ...` commands.
+- Configuration is stored in `~/.config/gnedby/embed_config.json`.
 
 === Vector DB Schema
 
@@ -323,7 +335,7 @@ CREATE TABLE albums (
   title text,
   artist text,
   artwork_url text,
-  embedding vector(1000)
+  embedding vector(1280)
 );
 CREATE INDEX ON albums USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 ```
@@ -372,13 +384,13 @@ The embedding model used is MobileNetV2, executed entirely within Rust for porta
 Image preprocessing includes:
 - Resizing to 224x224 pixels
 - Normalization using ImageNet mean and standard deviation values
-- Conversion to tensor format suitable for ONNX model input
+- Conversion to tensor format suitable for MobileNetV2 model input
 
 
 == Implementation
 
 . Add `embed` subcommand to the CLI
-. Load the ONNX model at runtime using `ort` crate
+. Load the model at runtime using `ort` crate
 . Fetch artwork image using `reqwest`
 . Preprocess image using `image` and `ndarray` crates to format as input tensor
 . Run inference via ONNX Runtime to get 512-d vector
@@ -388,7 +400,7 @@ Image preprocessing includes:
 
 == Milestones
 
-- Phase 1: ONNX model integration with image preprocessing and local embedding
+- Phase 1: model integration with image preprocessing and local embedding
 - Phase 2: Verified upload to Supabase with REST API and schema index
 - Phase 3: Test embedding consistency across systems
 
@@ -396,8 +408,8 @@ Image preprocessing includes:
 
 The embedding model (MobileNetV2) is not embedded in the binary due to size constraints. Instead, GNEDBY will automatically download the model on first use.
 
-- On first run of `gnedby embed`, the CLI checks for the presence of the ONNX model in a local cache directory (e.g., `$HOME/.cache/gnedby` or platform-specific location).
-- If not found, the model is downloaded from the ONNX Model Zoo GitHub repository.
+- On first run of `gnedby embed`, the CLI checks for the presence of the model in a local cache directory (e.g., `$HOME/.cache/gnedby` or platform-specific location).
+- If not found, the model is downloaded from public supabase storage.
 - After download, the model is reused locally for all subsequent embedding operations.
 - This allows the CLI to remain lightweight and installation via `cargo install gnedby` to be seamless.
 

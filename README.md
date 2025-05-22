@@ -80,13 +80,35 @@ gnedby serve
 ### Embedding Artworks
 
 ```bash
-gnedby embed
+gnedby embed run [--force]
 ```
 
-- Note: The first time you run `gnedby embed`, the required embedding model will be automatically downloaded to your local cache directory. This only happens once and allows the tool to work fully offline afterward.
 - Downloads artwork image for each album
-- Generates a 1000-dimension embedding vector using MobileNet
+- Generates a 1280-dimension embedding vector using the MobileNetV2 embedding model
 - Uploads to Supabase Vector DB for future image similarity search
+- If `--force` is given, all albums are processed; otherwise, only albums without embeddings are processed.
+
+#### Embedding Model Management
+
+```bash
+gnedby embed load-model
+```
+
+- Downloads the embedding model (ONNX format) from Supabase public storage to your local config directory (`~/.config/gnedby/model.onnx`).
+- If the model file already exists, download is skipped.
+- This command must be run before embedding if the model is not present.
+
+#### Embedding Configuration
+
+```bash
+gnedby embed config show
+gnedby embed config set api_url <supabase_vector_api_url>
+gnedby embed config set token <supabase_token>
+gnedby embed config reset
+```
+
+- Manage embedding-related configuration such as Supabase Vector DB API URL and token.
+- Configuration is stored in `~/.config/gnedby/embed_config.json`.
 
 ## Sync Setup
 
