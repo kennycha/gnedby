@@ -33,7 +33,7 @@ impl Embedder {
 
         let mut vectors = Vec::new();
         let albums_to_process = if force {
-            albums.iter().take(5).collect::<Vec<_>>()
+            albums.iter().collect::<Vec<_>>()
         } else {
             let config = load_embed_config()?;
             let api_url = config
@@ -46,7 +46,6 @@ impl Embedder {
             albums
                 .iter()
                 .filter(|a| a.id.is_some() && !embedded_ids.contains(&a.id.unwrap()))
-                .take(5)
                 .collect::<Vec<_>>()
         };
 
