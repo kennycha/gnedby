@@ -8,13 +8,13 @@ mod sync;
 mod web;
 
 use anyhow::Result;
-use api::bulk_upload_album_vectors;
+use api::{bulk_upload_album_vectors, fetch_embedded_album_ids, update_album_vector};
 use cli::{parse_args, Command, EmbedCommand, EmbedConfigCommand, SyncCommand, SyncConfigCommand};
 use comfy_table::{presets::UTF8_BORDERS_ONLY, Cell, CellAlignment, ContentArrangement, Table};
 use config::{load_embed_config, load_sync_config, save_embed_config, save_sync_config};
 use db::{Album, Database};
 use dialoguer::Input;
-use embed::Embedder;
+use embed::{models::AlbumVector, Embedder};
 use metadata::fetch_album_metadata;
 
 fn main() {
@@ -369,8 +369,6 @@ async fn run() -> Result<()> {
             EmbedCommand::Run { force } => {
                 println!("Starting embedding generation...");
                 let embedder = Embedder::new().await?;
-                let vectors = embedder.process_albums(&db, force).await?;
-                println!("Embedding generation completed. Uploading to Supabase...");
                 let config = load_embed_config()?;
                 let api_url = config
                     .api_url
@@ -378,7 +376,46 @@ async fn run() -> Result<()> {
                 let token = config
                     .token
                     .ok_or_else(|| anyhow::anyhow!("token is not set."))?;
-                bulk_upload_album_vectors(&api_url, &token, &vectors).await?;
+
+                let albums = db.get_all_albums().await?;
+                println!("Found {} albums in local database", albums.len());
+
+                let existing_ids = fetch_embedded_album_ids(&api_url, &token).await?;
+                let albums_to_process: Vec<_> = if force {
+                    println!("Force mode: processing all albums...");
+                    albums.iter().collect()
+                } else {
+                    println!("Processing only albums without embeddings...");
+                    albums
+                        .iter()
+                        .filter(|a| a.id.is_some() && !existing_ids.contains(&a.id.unwrap()))
+                        .collect()
+                };
+
+                let vectors = embedder.process_albums(&albums_to_process).await?;
+                println!("Embedding generation completed. Uploading to Supabase...");
+
+                if force {
+                    let (to_create, to_update): (Vec<_>, Vec<_>) =
+                        vectors.iter().partition(|v| !existing_ids.contains(&v.id));
+
+                    if !to_create.is_empty() {
+                        let to_create_vec: Vec<AlbumVector> =
+                            to_create.into_iter().cloned().collect();
+                        bulk_upload_album_vectors(&api_url, &token, &to_create_vec).await?;
+                    }
+
+                    if !to_update.is_empty() {
+                        println!("Updating {} existing embeddings...", to_update.len());
+                        for vector in to_update {
+                            update_album_vector(&api_url, &token, vector).await?;
+                        }
+                    }
+                } else {
+                    println!("Uploading {} new embeddings...", vectors.len());
+                    bulk_upload_album_vectors(&api_url, &token, &vectors).await?;
+                }
+
                 println!("Embedding generation & upload completed successfully");
             }
             EmbedCommand::LoadModel => {

@@ -72,3 +72,36 @@ pub async fn fetch_embedded_album_ids(api_url: &str, token: &str) -> Result<Vec<
     }
     Ok(result)
 }
+
+pub async fn update_album_vector(api_url: &str, token: &str, vector: &AlbumVector) -> Result<()> {
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/album_vectors?id=eq.{}",
+        api_url.trim_end_matches('/'),
+        vector.id
+    );
+
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", token))?,
+    );
+    headers.insert("apikey", HeaderValue::from_str(token)?);
+
+    let res = client
+        .patch(&url)
+        .headers(headers)
+        .json(vector)
+        .send()
+        .await
+        .context("Failed to send update request to Supabase")?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        anyhow::bail!("Supabase API error (update): {} - {}", status, text);
+    }
+
+    Ok(())
+}

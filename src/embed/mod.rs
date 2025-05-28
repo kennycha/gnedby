@@ -1,4 +1,4 @@
-use crate::db::Database;
+use crate::db::models::Album;
 use crate::embed::models::AlbumVector;
 use anyhow::Result;
 
@@ -9,9 +9,6 @@ pub mod processor;
 
 use model::EmbeddingModel;
 use processor::ImageProcessor;
-
-use crate::api::fetch_embedded_album_ids;
-use crate::config::load_embed_config;
 
 pub struct Embedder {
     image_processor: ImageProcessor,
@@ -26,30 +23,11 @@ impl Embedder {
         })
     }
 
-    pub async fn process_albums(&self, db: &Database, force: bool) -> Result<Vec<AlbumVector>> {
-        let albums = db.get_all_albums().await?;
-        println!("Found {} albums in local database", albums.len());
-        println!("Processing first 5 albums for testing...");
+    pub async fn process_albums(&self, albums: &[&Album]) -> Result<Vec<AlbumVector>> {
+        println!("Processing {} albums...", albums.len());
 
         let mut vectors = Vec::new();
-        let albums_to_process = if force {
-            albums.iter().collect::<Vec<_>>()
-        } else {
-            let config = load_embed_config()?;
-            let api_url = config
-                .api_url
-                .ok_or_else(|| anyhow::anyhow!("api_url is not set."))?;
-            let token = config
-                .token
-                .ok_or_else(|| anyhow::anyhow!("token is not set."))?;
-            let embedded_ids = fetch_embedded_album_ids(&api_url, &token).await?;
-            albums
-                .iter()
-                .filter(|a| a.id.is_some() && !embedded_ids.contains(&a.id.unwrap()))
-                .collect::<Vec<_>>()
-        };
-
-        for album in albums_to_process {
+        for album in albums {
             println!(
                 "\nProcessing artwork for {} by {}",
                 album.album, album.artist
