@@ -1,6 +1,6 @@
 [package]
 name = "gnedby"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 authors = ["Kenny Cha <dudqn136@naver.com>"]
 description = "A CLI tool for managing your CD/LP collection using Apple Music API"

@@ -10,8 +10,10 @@
 ## Installation
 
 ```bash
-cargo install gnedby
+cargo install gnedby --locked
 ```
+
+⚠️ Note: I recommend using the --locked flag to ensure dependency compatibility.
 
 ## Basic Usage
 
