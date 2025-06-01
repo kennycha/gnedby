@@ -1,11 +1,11 @@
 # GNEDBY
 
-> After buying a CD that was already in my GNEDBY, I thought there is a problem to solve
+> After accidentally buying a duplicate CD, I realized there was a problem to solve
 
 ## What is GNEDBY?
 
-- GNEDBY is a CLI tool for digitizing physical music library.
-- GNEDBY was named after IKEA's "GNEDBY".
+- GNEDBY is a CLI tool for digitizing a physical music collection.
+- GNEDBY was named after IKEA's "GNEDBY" shelf.
 
 ## Installation
 
@@ -13,51 +13,64 @@
 cargo install gnedby --locked
 ```
 
-⚠️ Note: I recommend using the --locked flag to ensure dependency compatibility.
+⚠️ **Note:** I recommend using the `--locked` flag to ensure dependency compatibility.
 
 ## Basic Usage
 
-- Add music albums using Apple Music's album IDs
+### Add Albums
+
+Add music albums using Apple Music's album IDs:
 
 ```bash
 gnedby add <album_id>... [--format <cd|lp|usb|tape>]
 ```
 
-- Add music album manually, if Apple Music doesn't serve it
+Add albums manually if they're not available on Apple Music:
 
 ```bash
 gnedby manual-add [--format <cd|lp|usb|tape>]
 ```
 
-- View albums
+### View Your Collection
+
+Display albums with various filters:
 
 ```bash
 gnedby show [--year <YYYY>] [--artist <name>] [--genre <genre>] [--format <cd|lp|usb|tape>] [--country <country>] [--order-by id|album|artist|year]
 ```
 
-- View reports
+Generate collection reports:
 
 ```bash
 gnedby report [--year] [--artist] [--genre] [--format] [--country]
 ```
 
-- Remove album
+### Manage Albums
+
+Remove an album:
 
 ```bash
 gnedby delete <id>
 ```
 
-## Further Usage
+## Advanced Features
 
-- Synchronization
+### Synchronization
+
+Check sync status:
 
 ```bash
 gnedby sync check [-v|--verbose]
+```
+
+Sync with remote storage:
+
+```bash
 gnedby sync pull
 gnedby sync push
 ```
 
-- Configuration for sync
+Configure sync settings:
 
 ```bash
 gnedby sync config show
@@ -67,27 +80,31 @@ gnedby sync config set auto_sync true|false
 gnedby sync config reset
 ```
 
-- View albums in browser
+### Web Interface
+
+View your collection in a browser:
 
 ```bash
 gnedby serve
 ```
 
-## And I Use This Project Like:
+## Album Artwork Embedding
 
-- Embedding artworks
+For use with the "Is It In My GNEDBY?" web app:
+
+Generate artwork embeddings:
 
 ```bash
 gnedby embed run [--force]
 ```
 
-- Load embedding model
+Load the embedding model:
 
 ```bash
 gnedby embed load-model
 ```
 
-- Configuration for embed
+Configure embedding settings:
 
 ```bash
 gnedby embed config show
@@ -96,7 +113,9 @@ gnedby embed config set token <supabase_token>
 gnedby embed config reset
 ```
 
-- Check if it's in my GNEDBY
+## My Personal Use Case
 
-  - https://kennycha.github.io/iii-my-gnedby/
-  - https://github.com/kennycha/iii-my-gnedby
+I built a companion web app to check if an album is already in my collection before buying:
+
+- Web app: https://kennycha.github.io/iii-my-gnedby/
+- Source code: https://github.com/kennycha/iii-my-gnedby
